@@ -1,0 +1,68 @@
+# ===== 텍스트 파일 (LF 줄바꿈 강제) =====
+*.cs        text eol=lf diff=csharp
+*.shader    text eol=lf
+*.cginc     text eol=lf
+*.hlsl      text eol=lf
+*.txt       text eol=lf
+*.md        text eol=lf
+*.json      text eol=lf
+*.xml       text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+
+# ===== Unity YAML 에셋 (텍스트, Unity 머지 도구 사용) =====
+*.meta              merge=unityyamlmerge eol=lf
+*.unity             merge=unityyamlmerge eol=lf
+*.asset             merge=unityyamlmerge eol=lf
+*.prefab            merge=unityyamlmerge eol=lf
+*.mat               merge=unityyamlmerge eol=lf
+*.anim              merge=unityyamlmerge eol=lf
+*.controller        merge=unityyamlmerge eol=lf
+*.overrideController merge=unityyamlmerge eol=lf
+*.physicMaterial    merge=unityyamlmerge eol=lf
+*.physicsMaterial2D merge=unityyamlmerge eol=lf
+*.mixer             merge=unityyamlmerge eol=lf
+*.lighting          merge=unityyamlmerge eol=lf
+*.preset            merge=unityyamlmerge eol=lf
+*.guiskin           merge=unityyamlmerge eol=lf
+*.shadergraph       merge=unityyamlmerge eol=lf
+*.shadersubgraph    merge=unityyamlmerge eol=lf
+
+# ===== Git LFS로 추적할 바이너리 =====
+# 이미지
+*.png   filter=lfs diff=lfs merge=lfs -text
+*.jpg   filter=lfs diff=lfs merge=lfs -text
+*.jpeg  filter=lfs diff=lfs merge=lfs -text
+*.gif   filter=lfs diff=lfs merge=lfs -text
+*.psd   filter=lfs diff=lfs merge=lfs -text
+*.tga   filter=lfs diff=lfs merge=lfs -text
+*.bmp   filter=lfs diff=lfs merge=lfs -text
+*.tif   filter=lfs diff=lfs merge=lfs -text
+*.tiff  filter=lfs diff=lfs merge=lfs -text
+*.exr   filter=lfs diff=lfs merge=lfs -text
+*.hdr   filter=lfs diff=lfs merge=lfs -text
+
+# 폰트
+*.ttf   filter=lfs diff=lfs merge=lfs -text
+*.otf   filter=lfs diff=lfs merge=lfs -text
+
+# 오디오
+*.wav   filter=lfs diff=lfs merge=lfs -text
+*.mp3   filter=lfs diff=lfs merge=lfs -text
+*.ogg   filter=lfs diff=lfs merge=lfs -text
+*.aif   filter=lfs diff=lfs merge=lfs -text
+*.aiff  filter=lfs diff=lfs merge=lfs -text
+
+# 모델 (이번 프로젝트엔 없지만 추후 대비)
+*.fbx   filter=lfs diff=lfs merge=lfs -text
+*.obj   filter=lfs diff=lfs merge=lfs -text
+*.blend filter=lfs diff=lfs merge=lfs -text
+
+# 비디오
+*.mp4   filter=lfs diff=lfs merge=lfs -text
+*.mov   filter=lfs diff=lfs merge=lfs -text
+*.webm  filter=lfs diff=lfs merge=lfs -text
+
+# Unity 패키지/번들
+*.unitypackage filter=lfs diff=lfs merge=lfs -text
+*.dll          filter=lfs diff=lfs merge=lfs -text
