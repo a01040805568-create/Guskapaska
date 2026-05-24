@@ -190,9 +190,6 @@ namespace Guskapaska.UI
 
         private void HandlePlayerDrop(CardInteractable card)
         {
-            // Branch 2 검증용 임시 로그. Branch 3에서 GameUIController가 실제 처리를 맡으면 제거할 것.
-            Debug.Log($"[DragController] Player dropped card: {card?.CardView?.BoundCard?.Id ?? "(null)"}");
-
             OnPlayerCardSubmitted?.Invoke(card);
 
             // 제출된 카드는 복귀 대상이 아니므로 _activeDrag를 미리 비운다.

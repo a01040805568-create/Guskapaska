@@ -28,6 +28,9 @@ namespace Guskapaska.UI
 
         /// <summary>
         /// Render the given cards. Reuses existing CardView instances to minimize churn.
+        /// Also reclaims any pooled view whose transform was reparented outside the
+        /// container (e.g. mid-drag cards that ended up under the Canvas root), to
+        /// guarantee that no orphaned card visuals are left behind after a submission.
         /// </summary>
         public void Render(IReadOnlyList<Card> cards)
         {
@@ -46,9 +49,24 @@ namespace Guskapaska.UI
             }
 
             // 남는 뷰는 비활성화 (Destroy 대신 SetActive로 재사용 가능하게 유지)
+            // 또한 드래그 도중 부모가 Canvas 루트로 옮겨진 채 풀에 남은 뷰가 있을 수 있으므로
+            // 부모를 cardContainer로 강제 복구해 화면에 떠 있는 잔상을 방지한다.
             for (int i = cards.Count; i < _activeViews.Count; i++)
             {
-                _activeViews[i].gameObject.SetActive(false);
+                CardView leftoverView = _activeViews[i];
+                if (leftoverView == null)
+                {
+                    continue;
+                }
+
+                // 부모가 컨테이너 밖이라면 다시 컨테이너 아래로 회수.
+                // worldPositionStays=false: 어차피 곧 비활성화되므로 좌표 보존이 불필요.
+                if (leftoverView.transform.parent != cardContainer)
+                {
+                    leftoverView.transform.SetParent(cardContainer, worldPositionStays: false);
+                }
+
+                leftoverView.gameObject.SetActive(false);
             }
 
             // 각 카드 바인딩 및 위치 계산
@@ -60,6 +78,18 @@ namespace Guskapaska.UI
             {
                 CardView view = _activeViews[i];
                 view.gameObject.SetActive(true);
+
+                // ★ 드래그 등으로 부모가 Canvas 루트로 이동된 뷰가 있을 수 있다.
+                // 이 경우 anchoredPosition만 갱신해도 카드는 손패 위치로 돌아오지 않는다.
+                // 따라서 부모를 cardContainer로 강제 복구한 뒤 위치/회전/스케일을 잡는다.
+                if (view.transform.parent != cardContainer)
+                {
+                    view.transform.SetParent(cardContainer, worldPositionStays: false);
+                }
+
+                // 손패는 평면 배치이므로 sibling 순서도 재정렬해 시각적 z-order를 일관되게 유지.
+                view.transform.SetSiblingIndex(i);
+
                 view.Bind(cards[i]);
                 view.SetFaceUp(faceUp);
 
@@ -85,12 +115,25 @@ namespace Guskapaska.UI
 
         /// <summary>
         /// Hide all active CardViews without destroying them.
+        /// Any view that was reparented away from the container (e.g. mid-drag) is
+        /// returned to the container so the pool remains in a clean state.
         /// </summary>
         public void Clear()
         {
-            // 모든 뷰 비활성화 및 바인딩 해제
+            // 모든 뷰 비활성화 및 바인딩 해제.
+            // 드래그 도중 Canvas 루트로 옮겨진 뷰가 있다면 부모도 함께 복구한다.
             foreach (CardView view in _activeViews)
             {
+                if (view == null)
+                {
+                    continue;
+                }
+
+                if (view.transform.parent != cardContainer)
+                {
+                    view.transform.SetParent(cardContainer, worldPositionStays: false);
+                }
+
                 view.Clear();
                 view.gameObject.SetActive(false);
             }
