@@ -1533,6 +1533,18 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 6007867291018227355, guid: 2230673add3321f4596a06f0bf54b395, type: 3}
+      propertyPath: m_RaycastTarget
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6616538975035778206, guid: 2230673add3321f4596a06f0bf54b395, type: 3}
+      propertyPath: m_RaycastTarget
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7289845598129669158, guid: 2230673add3321f4596a06f0bf54b395, type: 3}
+      propertyPath: m_RaycastTarget
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 9051127407080282022, guid: 2230673add3321f4596a06f0bf54b395, type: 3}
       propertyPath: m_Name
       value: PlayerSlot
@@ -1540,7 +1552,10 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 9051127407080282022, guid: 2230673add3321f4596a06f0bf54b395, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 770772889}
   m_SourcePrefab: {fileID: 100100000, guid: 2230673add3321f4596a06f0bf54b395, type: 3}
 --- !u!224 &770772886 stripped
 RectTransform:
@@ -1552,12 +1567,29 @@ MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 2284224983681634336, guid: 2230673add3321f4596a06f0bf54b395, type: 3}
   m_PrefabInstance: {fileID: 770772885}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
+  m_GameObject: {fileID: 770772888}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8a8a47ffbd2e3fb408a57d36e9b4b4fb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Guskapaska.UI.CardView
+--- !u!1 &770772888 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 9051127407080282022, guid: 2230673add3321f4596a06f0bf54b395, type: 3}
+  m_PrefabInstance: {fileID: 770772885}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &770772889
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 770772888}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a88dec8ed66e986408d9a389d6009904, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Guskapaska.UI.DropZone
 --- !u!1 &932232194
 GameObject:
   m_ObjectHideFlags: 0
@@ -4133,6 +4165,52 @@ MonoBehaviour:
   cardSpacing: 130
   arcAngleDegrees: 0
   arcHeight: 0
+--- !u!1 &2035651772
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2035651774}
+  - component: {fileID: 2035651773}
+  m_Layer: 0
+  m_Name: DragController
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2035651773
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2035651772}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4e5ec2c5fb2ca4458ed941a42152d99, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Guskapaska.UI.DragController
+  playerDropZone: {fileID: 770772889}
+  playerHandView: {fileID: 2106018789}
+--- !u!4 &2035651774
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2035651772}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 631.87805, y: 246.6177, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2106018787
 GameObject:
   m_ObjectHideFlags: 0
@@ -4288,3 +4366,4 @@ SceneRoots:
   - {fileID: 1183699334}
   - {fileID: 2146237353}
   - {fileID: 1550391557}
+  - {fileID: 2035651774}
