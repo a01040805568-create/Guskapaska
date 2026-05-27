@@ -28,6 +28,7 @@ namespace Guskapaska.UI
         private CardInteractable _activeDrag;
 
         // 이벤트를 구독한 카드들의 집합. 해제 누락과 중복 구독을 막기 위해 추적.
+        // 또한 "이 카드가 플레이어 손패에 속하는가" 의 신뢰 가능한 판정 출처로도 쓰인다.
         private readonly HashSet<CardInteractable> _registered = new HashSet<CardInteractable>();
 
         private void Awake()
@@ -190,6 +191,21 @@ namespace Guskapaska.UI
 
         private void HandlePlayerDrop(CardInteractable card)
         {
+            // 안전망: DropZone이 카드가 누구 소속인지 모르므로 여기서 검증한다.
+            // 등록되지 않은 카드(예: AI 손패의 카드)가 드롭되면 게임이 잘못 진행되는 것을 막는다.
+            // - 정상 흐름: 플레이어 카드 → _registered에 포함 → 정상 제출
+            // - 비정상 흐름: AI 카드가 어떻게든 드래그되어 PlayerSlot에 놓임 → 거부하고 복귀시킴
+            if (card == null || !_registered.Contains(card))
+            {
+                if (card != null)
+                {
+                    // 플레이어 손패가 아닌 카드라도 어찌됐든 드래그 상태이므로 원위치로 돌려준다.
+                    card.ReturnToOrigin();
+                }
+                _activeDrag = null;
+                return;
+            }
+
             OnPlayerCardSubmitted?.Invoke(card);
 
             // 제출된 카드는 복귀 대상이 아니므로 _activeDrag를 미리 비운다.

@@ -891,8 +891,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d43ebedd64610324abbd96c487840cf0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Guskapaska.UI.SubmissionZoneView
-  playerSlot: {fileID: 0}
-  aiSlot: {fileID: 0}
+  playerSlot: {fileID: 770772893}
+  aiSlot: {fileID: 1147033908}
+  playerSlotBackground: {fileID: 770772894}
+  playerSlotFrontFace: {fileID: 1082295870}
+  playerSlotBackFace: {fileID: 1209240229}
 --- !u!1 &559936001
 GameObject:
   m_ObjectHideFlags: 0
@@ -1300,6 +1303,10 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7289845598129669158, guid: 2230673add3321f4596a06f0bf54b395, type: 3}
+      propertyPath: m_Color.a
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7289845598129669158, guid: 2230673add3321f4596a06f0bf54b395, type: 3}
       propertyPath: m_RaycastTarget
       value: 0
       objectReference: {fileID: 0}
@@ -1337,6 +1344,28 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a88dec8ed66e986408d9a389d6009904, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Guskapaska.UI.DropZone
+--- !u!114 &770772893 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 2284224983681634336, guid: 2230673add3321f4596a06f0bf54b395, type: 3}
+  m_PrefabInstance: {fileID: 770772885}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 770772888}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8a8a47ffbd2e3fb408a57d36e9b4b4fb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Guskapaska.UI.CardView
+--- !u!114 &770772894 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 1212189692570360285, guid: 2230673add3321f4596a06f0bf54b395, type: 3}
+  m_PrefabInstance: {fileID: 770772885}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 770772888}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
 --- !u!1 &932232194
 GameObject:
   m_ObjectHideFlags: 0
@@ -1947,6 +1976,11 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 80}
   m_Pivot: {x: 0.5, y: 1}
+--- !u!1 &1082295870 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 4016230205038093836, guid: 2230673add3321f4596a06f0bf54b395, type: 3}
+  m_PrefabInstance: {fileID: 770772885}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1086471354
 GameObject:
   m_ObjectHideFlags: 0
@@ -2238,6 +2272,17 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 3121985080765181957, guid: 2230673add3321f4596a06f0bf54b395, type: 3}
   m_PrefabInstance: {fileID: 1138971861}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1147033908 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 2284224983681634336, guid: 2230673add3321f4596a06f0bf54b395, type: 3}
+  m_PrefabInstance: {fileID: 1138971861}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8a8a47ffbd2e3fb408a57d36e9b4b4fb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Guskapaska.UI.CardView
 --- !u!1 &1160963853
 GameObject:
   m_ObjectHideFlags: 0
@@ -2443,6 +2488,11 @@ MonoBehaviour:
   m_InputActionsPerSecond: 10
   m_RepeatDelay: 0.5
   m_ForceModuleActive: 0
+--- !u!1 &1209240229 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 864972237559948409, guid: 2230673add3321f4596a06f0bf54b395, type: 3}
+  m_PrefabInstance: {fileID: 770772885}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1232288567
 GameObject:
   m_ObjectHideFlags: 0
@@ -2605,6 +2655,7 @@ MonoBehaviour:
   timerView: {fileID: 11206144}
   drawAccumulator: {fileID: 977621858}
   resultPanel: {fileID: 1492720612}
+  roundLabel: {fileID: 153089466}
   dragController: {fileID: 2035651773}
 --- !u!1 &1562615597
 GameObject:
@@ -3897,6 +3948,7 @@ MonoBehaviour:
   cardContainer: {fileID: 1720227269}
   cardViewPrefab: {fileID: 9051127407080282022, guid: 2230673add3321f4596a06f0bf54b395, type: 3}
   faceUp: 0
+  interactable: 0
   cardSpacing: 130
   arcAngleDegrees: 0
   arcHeight: 0
@@ -3998,6 +4050,7 @@ MonoBehaviour:
   cardContainer: {fileID: 336681250}
   cardViewPrefab: {fileID: 9051127407080282022, guid: 2230673add3321f4596a06f0bf54b395, type: 3}
   faceUp: 1
+  interactable: 1
   cardSpacing: 130
   arcAngleDegrees: 0
   arcHeight: 0

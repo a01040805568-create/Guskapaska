@@ -28,6 +28,10 @@ namespace Guskapaska.UI
         [SerializeField] private DrawAccumulatorView drawAccumulator;
         [SerializeField] private ResultPanelController resultPanel;
 
+        [Header("Top Bar")]
+        [Tooltip("상단의 라운드 표시 TMP 텍스트. OnRoundStarted/OnMatchStarted에서 갱신된다.")]
+        [SerializeField] private TextMeshProUGUI roundLabel;
+
         [Header("Drag")]
         [SerializeField] private DragController dragController;
 
@@ -77,6 +81,7 @@ namespace Guskapaska.UI
             if (drawAccumulator == null)     { Debug.LogError("[GameUIController] drawAccumulator 가 연결되지 않았습니다."); ok = false; }
             if (resultPanel == null)         { Debug.LogError("[GameUIController] resultPanel 이 연결되지 않았습니다."); ok = false; }
             if (dragController == null)      { Debug.LogError("[GameUIController] dragController 가 연결되지 않았습니다."); ok = false; }
+            // roundLabel은 선택 사항(Optional). 연결되어 있지 않으면 라운드 표시만 비활성화되고 게임은 진행된다.
 
             return ok;
         }
@@ -159,6 +164,11 @@ namespace Guskapaska.UI
             drawAccumulator.SetCoins(0);
             resultPanel.Hide();
 
+            // 매치 시작 시점에 라운드 라벨을 1로 강제 표시.
+            // OnRoundStarted가 곧이어 호출되며 정식 값으로 덮어쓰지만,
+            // 강제 동기화 시점(Start 끝)에 한 프레임이라도 빈 상태로 두지 않기 위함.
+            UpdateRoundLabel(1);
+
             // 손패가 새로 렌더링됐으므로 드래그 등록.
             if (dragController != null)
             {
@@ -170,6 +180,9 @@ namespace Guskapaska.UI
         {
             submissionZone.Clear();
             Debug.Log($"[UI] Round {roundNumber} started");
+
+            // 상단의 "라운드 N" 표시를 갱신.
+            UpdateRoundLabel(roundNumber);
 
             // 새 라운드 시작 → 카드 다시 드래그 가능.
             if (dragController != null)
@@ -267,6 +280,17 @@ namespace Guskapaska.UI
             // 이후 흐름은 게임 이벤트로 이어진다:
             // GameManager → RoundController.SubmitPlayerCard → OnPlayerCardSubmitted 이벤트
             // → OnPlayerCardSubmitted 핸들러에서 손패 재렌더링 + SetAllInteractable(false)
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        // 내부 유틸
+        // ─────────────────────────────────────────────────────────────
+
+        // 라운드 라벨 텍스트를 갱신. 라벨이 Inspector에 연결되어 있지 않으면 무시.
+        private void UpdateRoundLabel(int roundNumber)
+        {
+            if (roundLabel == null) return;
+            roundLabel.text = $"라운드 {roundNumber}";
         }
     }
 }
