@@ -1,7 +1,9 @@
 using System;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using Guskapaska.Util;
 
 namespace Guskapaska.UI
 {
@@ -9,7 +11,8 @@ namespace Guskapaska.UI
     /// Handles pointer hover and drag input for a single <see cref="CardView"/>.
     /// Manages visual feedback (hover lift, drag scale, layering) and exposes
     /// drag lifecycle events for higher-level controllers to react to.
-    /// Drop detection itself is delegated to <c>DropZone</c> (Branch 2).
+    /// Drop detection itself is delegated to <c>DropZone</c>.
+    /// Stage 5 replaces the instant transform changes with smooth tweens.
     /// </summary>
     [RequireComponent(typeof(CanvasGroup))]
     public class CardInteractable : MonoBehaviour,
@@ -18,12 +21,17 @@ namespace Guskapaska.UI
     {
         [Header("Hover Settings")]
         [SerializeField] private float hoverYOffset = 20f;
+        [SerializeField] private float hoverDuration = 0.15f;
         [SerializeField] private Color hoverHighlightColor = new Color(1f, 0.9f, 0.3f, 1f);
         [SerializeField] private Outline hoverOutline;
 
         [Header("Drag Settings")]
         [SerializeField] private float dragScale = 1.2f;
         [SerializeField] private float dragRotationZ = 0f;
+        [SerializeField] private float dragScaleDuration = 0.1f;
+
+        [Header("Return Settings")]
+        [SerializeField] private float returnDuration = 0.25f;
 
         [Header("Refs")]
         [SerializeField] private CardView cardView;
@@ -48,16 +56,31 @@ namespace Guskapaska.UI
         /// <summary>The <see cref="CardView"/> this interactable wraps.</summary>
         public CardView CardView => cardView;
 
+        /// <summary>Whether this card is currently being dragged. Read-only.</summary>
+        public bool IsDragging => _isDragging;
+
         // 드래그 시작 전 원본 transform 상태. 복귀 시 그대로 되돌림.
-        private Vector3 _originalLocalPosition;
-        private Quaternion _originalLocalRotation;
-        private Vector3 _originalLocalScale;
-        private Transform _originalParent;
-        private int _originalSiblingIndex;
+        // _restLocalPosition: 호버/드래그가 전혀 없을 때의 진짜 원위치.
+        //                     HandView.Render가 설정한 마지막 위치이며,
+        //                     호버나 드래그 시작 시 이 값을 갱신하지 않는다 (핵심!).
+        private Vector3 _restLocalPosition;
+        private Quaternion _restLocalRotation;
+        private Vector3 _restLocalScale;
+        private Transform _restParent;
+        private int _restSiblingIndex;
 
         // 호버 / 드래그 상태 플래그. 호버 처리는 드래그 중 무시되어야 함.
         private bool _isHovering;
         private bool _isDragging;
+
+        // rest 상태가 한 번이라도 캡처됐는지. 첫 호버/드래그 전에는 false.
+        private bool _restCaptured;
+
+        // 트윈 키 — TweenRunner에서 동일 카드의 진행 중 트윈을 식별하는 ID.
+        private string HoverKey  => $"hover_{GetInstanceID()}";
+        private string ScaleKey  => $"scale_{GetInstanceID()}";
+        private string ReturnKey => $"return_{GetInstanceID()}";
+        private string ReturnRotKey => $"returnRot_{GetInstanceID()}";
 
         private void Awake()
         {
@@ -72,16 +95,66 @@ namespace Guskapaska.UI
                 canvasGroup = GetComponent<CanvasGroup>();
             }
 
-            // 스케일 원본은 프리팹 인스턴스 시점의 값을 보관. 호버는 위치만 건드리므로
-            // 매 호버마다 갱신하지 않는다.
-            _originalLocalScale = transform.localScale;
-
             // outline은 기본 비활성. 호버 시에만 켠다.
             if (hoverOutline != null)
             {
                 hoverOutline.enabled = false;
             }
         }
+
+        private void OnEnable()
+        {
+            // 카드가 (재)활성화될 때 현재 transform 상태를 rest로 캡처.
+            // HandView.Render → SetActive(true) → 위치 설정 순서일 가능성이 있어
+            // OnEnable 시점의 값이 안 맞을 수 있지만, 첫 호버 시점에 강제로 다시 캡처하므로 안전.
+            CaptureRestState();
+        }
+
+        private void OnDisable()
+        {
+            // 컴포넌트 비활성화 시 진행 중인 모든 트윈 취소.
+            TweenRunner.CancelAll(this);
+
+            // 호버/드래그 상태 강제 초기화. 재활성화 시 깨끗한 상태로 시작.
+            _isHovering = false;
+            _isDragging = false;
+
+            if (hoverOutline != null)
+            {
+                hoverOutline.enabled = false;
+            }
+
+            if (canvasGroup != null)
+            {
+                canvasGroup.blocksRaycasts = true;
+            }
+        }
+
+        /// <summary>
+        /// Captures the current transform as the "rest" state — the position the card
+        /// should return to after any hover or drag operation. Called by HandView after
+        /// laying out cards, and by OnEnable as a safety net.
+        /// </summary>
+        public void CaptureRestState()
+        {
+            // 호버나 드래그 중인 카드의 rest를 덮어쓰지 않는다 (현재 transform이 흐트러진 상태).
+            // 단, _restCaptured가 false이면 어떤 상태든 강제로 캡처 (첫 호출).
+            if (_restCaptured && (_isHovering || _isDragging))
+            {
+                return;
+            }
+
+            _restLocalPosition = transform.localPosition;
+            _restLocalRotation = transform.localRotation;
+            _restLocalScale = transform.localScale;
+            _restParent = transform.parent;
+            _restSiblingIndex = transform.GetSiblingIndex();
+            _restCaptured = true;
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        // 호버
+        // ─────────────────────────────────────────────────────────────
 
         /// <inheritdoc/>
         public void OnPointerEnter(PointerEventData eventData)
@@ -92,10 +165,19 @@ namespace Guskapaska.UI
                 return;
             }
 
-            // 호버 직전 위치를 기준점으로 저장. 드래그가 호버 도중 시작될 수도 있어
-            // OnBeginDrag에서 이 값을 다시 참조한다.
-            _originalLocalPosition = transform.localPosition;
-            transform.localPosition = _originalLocalPosition + new Vector3(0f, hoverYOffset, 0f);
+            // 호버 시작 전에 현재 위치가 rest와 일치하는지 점검.
+            // 만약 외부 코드(HandView.Render)가 위치를 바꿨다면 새 위치를 rest로 채택.
+            // 단, 이전 호버의 트윈 도중 위치가 _restLocalPosition + offset 근처일 수 있으므로
+            // 트윈이 진행 중인지 여부도 함께 본다.
+            if (!_restCaptured)
+            {
+                CaptureRestState();
+            }
+
+            // 호버 위치 = rest + 위쪽 오프셋. rest 자체는 절대 건드리지 않는다.
+            Vector3 hoverTarget = _restLocalPosition + new Vector3(0f, hoverYOffset, 0f);
+            TweenRunner.Run(this, HoverKey,
+                TweenRunner.MoveLocal(transform, transform.localPosition, hoverTarget, hoverDuration, EasingCurves.EaseOutQuad));
 
             if (hoverOutline != null)
             {
@@ -114,8 +196,9 @@ namespace Guskapaska.UI
                 return;
             }
 
-            // 호버로 올라간 만큼 다시 내려놓는다.
-            transform.localPosition = _originalLocalPosition;
+            // rest 위치로 부드럽게 복귀.
+            TweenRunner.Run(this, HoverKey,
+                TweenRunner.MoveLocal(transform, transform.localPosition, _restLocalPosition, hoverDuration, EasingCurves.EaseOutQuad));
 
             if (hoverOutline != null)
             {
@@ -124,6 +207,10 @@ namespace Guskapaska.UI
 
             _isHovering = false;
         }
+
+        // ─────────────────────────────────────────────────────────────
+        // 드래그 시작 / 진행 / 종료
+        // ─────────────────────────────────────────────────────────────
 
         /// <inheritdoc/>
         public void OnBeginDrag(PointerEventData eventData)
@@ -134,49 +221,52 @@ namespace Guskapaska.UI
                 return;
             }
 
-            // 호버 중이었다면 호버 오프셋을 먼저 제거. 이렇게 해야
-            // _originalLocalPosition이 호버 전 진짜 원본을 가리킨다.
+            // rest 상태가 캡처되지 않았다면 지금 캡처 (안전망).
+            if (!_restCaptured)
+            {
+                CaptureRestState();
+            }
+
+            // 호버 트윈이 진행 중일 수 있으므로 즉시 취소.
+            TweenRunner.Cancel(this, HoverKey);
+
+            // 호버 중이었다면 호버 오프셋을 먼저 제거.
+            // 핵심: rest 값은 절대 갱신하지 않는다. 호버는 일시적 시각 상태일 뿐.
             if (_isHovering)
             {
-                transform.localPosition = _originalLocalPosition;
-
                 if (hoverOutline != null)
                 {
                     hoverOutline.enabled = false;
                 }
-
                 _isHovering = false;
             }
 
-            // 복귀에 필요한 상태를 모두 저장.
-            _originalParent = transform.parent;
-            _originalSiblingIndex = transform.GetSiblingIndex();
-            _originalLocalPosition = transform.localPosition;
-            _originalLocalRotation = transform.localRotation;
-            // _originalLocalScale은 Awake에서 잡아둔 프리팹 기본 스케일을 그대로 사용.
+            // 진행 중인 복귀 트윈도 취소.
+            TweenRunner.Cancel(this, ReturnKey);
+            TweenRunner.Cancel(this, ReturnRotKey);
 
             // 부모를 Canvas 루트로 이동해 다른 카드 위에 그려지도록 한다.
-            // rootCanvas를 쓰는 이유: 중첩 Canvas가 있어도 최상위에 붙기 위함.
             Canvas containingCanvas = GetComponentInParent<Canvas>();
             if (containingCanvas != null)
             {
                 Transform canvasRoot = containingCanvas.rootCanvas.transform;
-                // worldPositionStays=false: 부모 이동 직후 localPosition을 우리가 직접 덮어쓸 것이므로
-                // Unity가 월드 위치 보존을 위해 localPosition을 임의로 바꾸지 않게 한다.
-                transform.SetParent(canvasRoot, worldPositionStays: false);
+                transform.SetParent(canvasRoot, worldPositionStays: true);
                 transform.SetAsLastSibling();
             }
             else
             {
-                Debug.LogWarning($"[CardInteractable] {name} 의 부모 Canvas를 찾지 못했습니다. 드래그 레이어링이 깨질 수 있습니다.");
+                Debug.LogWarning($"[CardInteractable] {name} 의 부모 Canvas를 찾지 못했습니다.");
             }
 
-            // 드래그 시각 효과 적용.
-            transform.localScale = Vector3.one * dragScale;
+            // 회전은 즉시 적용.
             transform.localRotation = Quaternion.Euler(0f, 0f, dragRotationZ);
 
+            // 스케일은 트윈으로 부드럽게 확대.
+            Vector3 targetScale = Vector3.one * dragScale;
+            TweenRunner.Run(this, ScaleKey,
+                TweenRunner.Scale(transform, transform.localScale, targetScale, dragScaleDuration, EasingCurves.EaseOutQuad));
+
             // 드래그 중인 카드가 자기 아래 영역의 raycast를 막으면 DropZone이 OnDrop을 받지 못한다.
-            // 02_Unity6_Guidelines.md의 Known Pitfalls 참조.
             canvasGroup.blocksRaycasts = false;
 
             _isDragging = true;
@@ -191,8 +281,7 @@ namespace Guskapaska.UI
                 return;
             }
 
-            // Screen Space - Overlay Canvas에서는 스크린 좌표를 그대로 위치로 사용 가능.
-            // Vector2 → Vector3는 z=0으로 암묵 변환.
+            // 마우스 추적은 즉시 (트윈 없음).
             transform.position = eventData.position;
             CurrentPointerPosition = eventData.position;
         }
@@ -205,39 +294,96 @@ namespace Guskapaska.UI
                 return;
             }
 
-            // raycast 차단을 먼저 풀어야 이후 호버/클릭이 정상 동작.
             canvasGroup.blocksRaycasts = true;
             _isDragging = false;
 
-            // 성공/실패 판정은 구독자(DragController)의 책임.
-            // 여기서는 일단 false로 발화하고, 실패 시 외부에서 ReturnToOrigin을 호출하도록 한다.
+            // OnDragEnded는 즉시 발화. 실제 복귀/제출 판정은 구독자(DragController) 책임.
             OnDragEnded?.Invoke(this, false);
         }
 
+        // ─────────────────────────────────────────────────────────────
+        // 복귀
+        // ─────────────────────────────────────────────────────────────
+
         /// <summary>
-        /// Restores this card to the parent, sibling order, position, rotation, and scale
-        /// captured at the start of the most recent drag.
-        /// Instant (no tween) — Stage 5 will replace this with a smooth coroutine.
+        /// Restores this card to its rest state (the position it had before any
+        /// hover or drag started) with a smooth tween.
         /// </summary>
         public void ReturnToOrigin()
         {
-            if (_originalParent == null)
+            if (!_restCaptured || _restParent == null)
             {
-                // 드래그를 한 번도 시작하지 않은 경우. 호출당해도 무해하게 처리.
+                // rest 상태가 캡처되지 않은 경우 (드래그 한 번도 안 한 카드). 무해 처리.
                 return;
             }
 
-            transform.SetParent(_originalParent, worldPositionStays: false);
-            transform.SetSiblingIndex(_originalSiblingIndex);
-            transform.localPosition = _originalLocalPosition;
-            transform.localRotation = _originalLocalRotation;
-            transform.localScale = _originalLocalScale;
+            // 부모와 형제 순서는 즉시 복원.
+            transform.SetParent(_restParent, worldPositionStays: false);
+            transform.SetSiblingIndex(_restSiblingIndex);
+
+            // 부모 변경 직후의 현재 transform 값을 시작점으로 사용.
+            Vector3 fromPos = transform.localPosition;
+            Quaternion fromRot = transform.localRotation;
+            Vector3 fromScale = transform.localScale;
+
+            // 위치 / 회전 / 스케일 동시 트윈.
+            // EaseOutBack은 약간의 오버슈트로 톡 튀는 마무리감.
+            TweenRunner.Run(this, ReturnKey,
+                TweenRunner.MoveLocal(transform, fromPos, _restLocalPosition, returnDuration, EasingCurves.EaseOutBack));
+
+            TweenRunner.Run(this, ReturnRotKey,
+                TweenRunner.Rotate(transform, fromRot, _restLocalRotation, returnDuration, EasingCurves.EaseOutQuad));
+
+            TweenRunner.Run(this, ScaleKey,
+                TweenRunner.Scale(transform, fromScale, _restLocalScale, returnDuration, EasingCurves.EaseOutQuad));
+
+            // 호버 상태는 명시적으로 해제. ReturnToOrigin은 "원래 자리로 완전 복귀"이므로
+            // 호버 잔재가 남으면 안 된다.
+            _isHovering = false;
+            if (hoverOutline != null)
+            {
+                hoverOutline.enabled = false;
+            }
+        }
+
+        /// <summary>
+        /// Restores this card to its rest state immediately, cancelling any in-flight tweens.
+        /// Use this for emergency cleanup (match end, forced reset).
+        /// </summary>
+        public void ReturnToOriginInstant()
+        {
+            TweenRunner.Cancel(this, ReturnKey);
+            TweenRunner.Cancel(this, ReturnRotKey);
+            TweenRunner.Cancel(this, ScaleKey);
+            TweenRunner.Cancel(this, HoverKey);
+
+            if (!_restCaptured || _restParent == null)
+            {
+                return;
+            }
+
+            transform.SetParent(_restParent, worldPositionStays: false);
+            transform.SetSiblingIndex(_restSiblingIndex);
+            transform.localPosition = _restLocalPosition;
+            transform.localRotation = _restLocalRotation;
+            transform.localScale = _restLocalScale;
+
+            _isHovering = false;
+            _isDragging = false;
+
+            if (hoverOutline != null)
+            {
+                hoverOutline.enabled = false;
+            }
+
+            if (canvasGroup != null)
+            {
+                canvasGroup.blocksRaycasts = true;
+            }
         }
 
         /// <summary>
         /// Forces the card out of the hovered state without waiting for OnPointerExit.
-        /// Useful when external logic needs to ensure the card is at its rest position
-        /// (e.g. when a new round starts and hands are re-rendered).
         /// </summary>
         public void ForceUnhover()
         {
@@ -246,7 +392,11 @@ namespace Guskapaska.UI
                 return;
             }
 
-            transform.localPosition = _originalLocalPosition;
+            TweenRunner.Cancel(this, HoverKey);
+            if (_restCaptured)
+            {
+                transform.localPosition = _restLocalPosition;
+            }
 
             if (hoverOutline != null)
             {

@@ -29,13 +29,17 @@ namespace Guskapaska.UI
         [SerializeField] private ResultPanelController resultPanel;
 
         [Header("Top Bar")]
-        [Tooltip("상단의 라운드 표시 TMP 텍스트. OnRoundStarted/OnMatchStarted에서 갱신된다.")]
+        [Tooltip("상단의 라운드 표시 TMP 텍스트.")]
         [SerializeField] private TextMeshProUGUI roundLabel;
 
         [Header("Drag")]
         [SerializeField] private DragController dragController;
 
         private bool _subscribed;
+
+        // 슬라이드 애니메이션이 진행 중인 카드. OnPlayerCardSubmitted가 발화되면 그 카드의 데이터는
+        // 슬라이드 코루틴이 처리할 것이므로 즉시 ShowPlayerCard를 호출하면 안 된다 (이중 표시 방지).
+        private CardInteractable _animatingSubmission;
 
         private void Start()
         {
@@ -44,13 +48,11 @@ namespace Guskapaska.UI
                 return;
             }
 
-            // 코인 그리드는 게임 규칙상 13칸으로 초기화 (00_GameDesign.md §5).
             coinGridView.Initialize();
 
             SubscribeEvents();
 
-            // §18: 구독 시점에 이미 발화된 MatchStarted 이벤트를 놓쳤을 수 있으므로
-            // 현재 GameState를 직접 읽어 UI를 강제 동기화.
+            // §18: 구독 시점에 이미 발화된 MatchStarted를 놓쳤을 수 있으므로 강제 동기화.
             if (gameManager != null && gameManager.State != null)
             {
                 OnMatchStarted(gameManager.State);
@@ -81,7 +83,6 @@ namespace Guskapaska.UI
             if (drawAccumulator == null)     { Debug.LogError("[GameUIController] drawAccumulator 가 연결되지 않았습니다."); ok = false; }
             if (resultPanel == null)         { Debug.LogError("[GameUIController] resultPanel 이 연결되지 않았습니다."); ok = false; }
             if (dragController == null)      { Debug.LogError("[GameUIController] dragController 가 연결되지 않았습니다."); ok = false; }
-            // roundLabel은 선택 사항(Optional). 연결되어 있지 않으면 라운드 표시만 비활성화되고 게임은 진행된다.
 
             return ok;
         }
@@ -150,26 +151,19 @@ namespace Guskapaska.UI
 
         private void OnMatchStarted(GameState state)
         {
-            // 양쪽 손패 렌더링 (HandView가 자체 faceUp 필드로 앞/뒷면 결정).
             playerHandView.Render(state.PlayerHand.Cards);
             aiHandView.Render(state.AiHand.Cards);
 
-            // 보석/코인 상태 초기화.
             playerGemPile.SetCount(0);
             aiGemPile.SetCount(0);
             coinGridView.SetRemaining(state.CenterGems);
 
-            // 라운드 종속 뷰들 초기화.
             submissionZone.Clear();
             drawAccumulator.SetCoins(0);
             resultPanel.Hide();
 
-            // 매치 시작 시점에 라운드 라벨을 1로 강제 표시.
-            // OnRoundStarted가 곧이어 호출되며 정식 값으로 덮어쓰지만,
-            // 강제 동기화 시점(Start 끝)에 한 프레임이라도 빈 상태로 두지 않기 위함.
             UpdateRoundLabel(1);
 
-            // 손패가 새로 렌더링됐으므로 드래그 등록.
             if (dragController != null)
             {
                 dragController.RegisterPlayerCards();
@@ -181,7 +175,6 @@ namespace Guskapaska.UI
             submissionZone.Clear();
             Debug.Log($"[UI] Round {roundNumber} started");
 
-            // 상단의 "라운드 N" 표시를 갱신.
             UpdateRoundLabel(roundNumber);
 
             // 새 라운드 시작 → 카드 다시 드래그 가능.
@@ -199,22 +192,25 @@ namespace Guskapaska.UI
 
         private void OnCountdownTriggered()
         {
-            // Stage 5에서 3-2-1 오버레이로 대체될 예정.
             Debug.Log("[UI] Countdown triggered");
         }
 
         private void OnPlayerCardSubmitted(Card card)
         {
-            submissionZone.ShowPlayerCard(card);
+            // 슬라이드 애니메이션 중이라면 코루틴이 ShowPlayerCard를 호출할 책임을 진다.
+            if (_animatingSubmission == null)
+            {
+                submissionZone.ShowPlayerCard(card);
+            }
 
-            // 카드가 손에서 제거됐으므로 손패를 다시 그린다.
+            // 손패 재렌더링.
             playerHandView.Render(gameManager.State.PlayerHand.Cards);
 
-            // 새로 그린 카드 인스턴스에 드래그 이벤트 재등록.
             if (dragController != null)
             {
                 dragController.RegisterPlayerCards();
-                // 제출 직후에는 라운드가 끝날 때까지 드래그 불가.
+                // 안전망 — 이미 OnPlayerCardDropped에서 SetAllInteractable(false)했지만,
+                // 새로 그려진 카드 인스턴스에 대해서도 명시적으로 차단 상태 유지.
                 dragController.SetAllInteractable(false);
             }
         }
@@ -227,16 +223,17 @@ namespace Guskapaska.UI
 
         private void OnRoundResolved(RoundOutcome outcome)
         {
-            // 라운드 결과로 패자에게 카드가 넘어갔을 수 있으므로 양쪽 손패 모두 재렌더링.
+            // 양쪽 손패 재렌더링 (패자 카드 이동 등 반영).
             playerHandView.Render(gameManager.State.PlayerHand.Cards);
             aiHandView.Render(gameManager.State.AiHand.Cards);
 
-            // 새 손패의 카드들도 드래그 가능하도록 등록.
-            // (실제 활성화/비활성화는 OnRoundStarted / OnPlayerCardSubmitted에서 토글)
             if (dragController != null)
             {
                 dragController.RegisterPlayerCards();
             }
+
+            // 슬라이드 추적 상태 초기화.
+            _animatingSubmission = null;
         }
 
         private void OnDrawAccumulatorChanged(int coins)
@@ -253,7 +250,6 @@ namespace Guskapaska.UI
 
         private void OnMatchEnded(MatchResult result)
         {
-            // 매치 종료 → 모든 드래그 비활성화.
             if (dragController != null)
             {
                 dragController.SetAllInteractable(false);
@@ -268,25 +264,36 @@ namespace Guskapaska.UI
 
         private void OnPlayerCardDropped(CardInteractable card)
         {
-            // 드롭된 카드의 데이터를 GameManager로 전달.
             if (card == null || card.CardView == null || card.CardView.BoundCard == null)
             {
                 return;
             }
 
             Card boundCard = card.CardView.BoundCard;
-            gameManager.OnPlayerSubmit(boundCard);
 
-            // 이후 흐름은 게임 이벤트로 이어진다:
-            // GameManager → RoundController.SubmitPlayerCard → OnPlayerCardSubmitted 이벤트
-            // → OnPlayerCardSubmitted 핸들러에서 손패 재렌더링 + SetAllInteractable(false)
+            // 핵심 변경 (버그 2 해결):
+            // gameManager.OnPlayerSubmit 호출은 그 안에서 AI 카드 제출까지 동기적으로 진행되며,
+            // 그 과정에서 AI HandView가 잠시 재렌더링되어 AI 카드가 활성 상태가 될 수 있다.
+            // 따라서 게임 로직 호출 BEFORE에 모든 카드를 즉시 입력 차단해야 한다.
+            if (dragController != null)
+            {
+                dragController.SetAllInteractable(false);
+            }
+
+            // 슬라이드 추적 마커.
+            _animatingSubmission = card;
+
+            // 시각 슬라이드 시작 (게임 로직과 별개로 진행).
+            StartCoroutine(submissionZone.AnimatePlayerCardSubmission(boundCard, card.transform));
+
+            // 게임 로직 진행.
+            gameManager.OnPlayerSubmit(boundCard);
         }
 
         // ─────────────────────────────────────────────────────────────
         // 내부 유틸
         // ─────────────────────────────────────────────────────────────
 
-        // 라운드 라벨 텍스트를 갱신. 라벨이 Inspector에 연결되어 있지 않으면 무시.
         private void UpdateRoundLabel(int roundNumber)
         {
             if (roundLabel == null) return;
