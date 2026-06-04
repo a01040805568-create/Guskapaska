@@ -46,5 +46,24 @@ namespace Guskapaska.Util
             Application.Quit();
 #endif
         }
+
+        /// <summary>
+        /// Load a scene through the active SceneTransition fader if present;
+        /// otherwise load it immediately.
+        /// </summary>
+        public static void LoadSceneWithFade(string sceneName, SceneTransition transition)
+        {
+            if (transition != null)
+            {
+                // fade-out 코루틴은 트랜지션 자신을 호스트로 실행하며, 페이드가 끝나면 씬을 로드한다.
+                transition.StartCoroutine(
+                    transition.FadeOut(() => SceneManager.LoadScene(sceneName)));
+            }
+            else
+            {
+                // 트랜지션이 없으면 즉시 로드로 폴백.
+                SceneManager.LoadScene(sceneName);
+            }
+        }
     }
 }

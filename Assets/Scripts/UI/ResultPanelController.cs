@@ -10,8 +10,8 @@ namespace Guskapaska.UI
     /// <summary>
     /// End-of-match overlay. Shown when GameEvents.OnMatchEnded fires.
     /// Provides Restart and Menu buttons.
-    /// Stage 6 adds a polished entrance (fade + scale) and a score count-up,
-    /// all driven through the shared <see cref="TweenRunner"/>.
+    /// Stage 6 adds a polished entrance (fade + scale), a score count-up,
+    /// and routes navigation through the scene fade transition.
     /// </summary>
     public class ResultPanelController : MonoBehaviour
     {
@@ -29,6 +29,10 @@ namespace Guskapaska.UI
         [SerializeField] private CanvasGroup canvasGroup;
         [Tooltip("스케일 등장 대상. 0.8에서 1.0으로 EaseOutBack 트윈된다.")]
         [SerializeField] private RectTransform panelTransform;
+
+        [Header("Transition (Stage 6)")]
+        [Tooltip("씬 전환 시 페이드 아웃에 사용. 비워두면 즉시 전환된다.")]
+        [SerializeField] private SceneTransition sceneTransition;
 
         // 등장 시 시작 스케일 (0.8 → 1.0). 디자인 사양 고정값.
         private const float AppearStartScale = 0.8f;
@@ -194,16 +198,16 @@ namespace Guskapaska.UI
             }
         }
 
-        // 다시 하기: 현재 Game 씬을 재로드
+        // 다시 하기: 현재 Game 씬을 재로드 (페이드 트랜지션 경유, 없으면 즉시).
         private void OnRestartClicked()
         {
-            SceneLoader.LoadGame();
+            SceneLoader.LoadSceneWithFade(SceneLoader.GameScene, sceneTransition);
         }
 
-        // 메인 메뉴로 돌아가기
+        // 메인 메뉴로 돌아가기 (페이드 트랜지션 경유, 없으면 즉시).
         private void OnMenuClicked()
         {
-            SceneLoader.LoadMainMenu();
+            SceneLoader.LoadSceneWithFade(SceneLoader.MainMenuScene, sceneTransition);
         }
     }
 }
