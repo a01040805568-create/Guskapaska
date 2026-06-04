@@ -1035,6 +1035,61 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 559936001}
   m_CullTransparentMesh: 1
+--- !u!1 &688944110
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 688944111}
+  - component: {fileID: 688944112}
+  m_Layer: 5
+  m_Name: AiSubmitAnimator
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &688944111
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 688944110}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 960557851}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 1}
+  m_AnchorMax: {x: 0.5, y: 1}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 1}
+--- !u!114 &688944112
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 688944110}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3fb7359ecf8f9324783cc6e8eb65279f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Guskapaska.UI.AiSubmitAnimator
+  aiHandAnchor: {fileID: 2020591407}
+  aiSlotAnchor: {fileID: 1138971862}
+  flyingCardPrefab: {fileID: 9051127407080282022, guid: 4da689b43328c674288a64a5fdf2fbf4, type: 3}
+  flyContainer: {fileID: 960557851}
+  arcHeight: 100
+  duration: 0.6
+  arrivalScale: 1
 --- !u!1 &706522166
 GameObject:
   m_ObjectHideFlags: 0
@@ -1606,6 +1661,7 @@ RectTransform:
   - {fileID: 156475868}
   - {fileID: 11206143}
   - {fileID: 1492720611}
+  - {fileID: 688944111}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -2659,6 +2715,8 @@ MonoBehaviour:
   resultPanel: {fileID: 1492720612}
   roundLabel: {fileID: 153089466}
   dragController: {fileID: 2035651773}
+  aiSubmitAnimator: {fileID: 688944112}
+  useDealAnimationAtMatchStart: 1
 --- !u!1 &1562615597
 GameObject:
   m_ObjectHideFlags: 0
@@ -3954,6 +4012,10 @@ MonoBehaviour:
   cardSpacing: 130
   arcAngleDegrees: 0
   arcHeight: 0
+  dealDurationPerCard: 0.4
+  dealStagger: 0.08
+  dealStartOffsetX: -800
+  dealStartOffsetY: 0
 --- !u!1 &2035651772
 GameObject:
   m_ObjectHideFlags: 0
@@ -4056,6 +4118,10 @@ MonoBehaviour:
   cardSpacing: 130
   arcAngleDegrees: 0
   arcHeight: 0
+  dealDurationPerCard: 0.4
+  dealStagger: 0.08
+  dealStartOffsetX: -800
+  dealStartOffsetY: 0
 --- !u!1 &2146237352
 GameObject:
   m_ObjectHideFlags: 0
