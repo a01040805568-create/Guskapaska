@@ -40,12 +40,20 @@ namespace Guskapaska.UI
         [Tooltip("AI 카드 포물선 비행 애니메이션을 담당하는 컴포넌트.")]
         [SerializeField] private AiSubmitAnimator aiSubmitAnimator;
 
+        [Tooltip("보석 비행 + 마리오 손 애니메이션을 담당하는 컴포넌트.")]
+        [SerializeField] private GemFlightAnimator gemFlightAnimator;
+
         [Header("Match Start Animation")]
-        [Tooltip("매치 시작 시 카드 딜 애니메이션을 사용할지 여부. true면 RenderWithDealAnimation 사용.")]
         [SerializeField] private bool useDealAnimationAtMatchStart = true;
 
         private bool _subscribed;
         private CardInteractable _animatingSubmission;
+
+        // 보석 비행 애니메이션 동기화를 위해 마지막으로 화면에 반영된 카운트를 추적.
+        // OnGemsChanged 시 이 값과 새 값의 차이로 누가 얼마를 가져갔는지 계산.
+        private int _lastDisplayedPlayerGems;
+        private int _lastDisplayedAiGems;
+        private int _lastDisplayedCenterGems;
 
         private void Start()
         {
@@ -78,18 +86,18 @@ namespace Guskapaska.UI
         {
             bool ok = true;
 
-            if (gameManager == null)         { Debug.LogError("[GameUIController] gameManager 가 연결되지 않았습니다."); ok = false; }
-            if (playerHandView == null)      { Debug.LogError("[GameUIController] playerHandView 가 연결되지 않았습니다."); ok = false; }
-            if (aiHandView == null)          { Debug.LogError("[GameUIController] aiHandView 가 연결되지 않았습니다."); ok = false; }
-            if (coinGridView == null)        { Debug.LogError("[GameUIController] coinGridView 가 연결되지 않았습니다."); ok = false; }
-            if (playerGemPile == null)       { Debug.LogError("[GameUIController] playerGemPile 이 연결되지 않았습니다."); ok = false; }
-            if (aiGemPile == null)           { Debug.LogError("[GameUIController] aiGemPile 이 연결되지 않았습니다."); ok = false; }
-            if (submissionZone == null)      { Debug.LogError("[GameUIController] submissionZone 이 연결되지 않았습니다."); ok = false; }
-            if (timerView == null)           { Debug.LogError("[GameUIController] timerView 가 연결되지 않았습니다."); ok = false; }
-            if (drawAccumulator == null)     { Debug.LogError("[GameUIController] drawAccumulator 가 연결되지 않았습니다."); ok = false; }
-            if (resultPanel == null)         { Debug.LogError("[GameUIController] resultPanel 이 연결되지 않았습니다."); ok = false; }
-            if (dragController == null)      { Debug.LogError("[GameUIController] dragController 가 연결되지 않았습니다."); ok = false; }
-            // aiSubmitAnimator는 선택사항 — 없으면 즉시 표시로 폴백.
+            if (gameManager == null) { Debug.LogError("[GameUIController] gameManager 가 연결되지 않았습니다."); ok = false; }
+            if (playerHandView == null) { Debug.LogError("[GameUIController] playerHandView 가 연결되지 않았습니다."); ok = false; }
+            if (aiHandView == null) { Debug.LogError("[GameUIController] aiHandView 가 연결되지 않았습니다."); ok = false; }
+            if (coinGridView == null) { Debug.LogError("[GameUIController] coinGridView 가 연결되지 않았습니다."); ok = false; }
+            if (playerGemPile == null) { Debug.LogError("[GameUIController] playerGemPile 이 연결되지 않았습니다."); ok = false; }
+            if (aiGemPile == null) { Debug.LogError("[GameUIController] aiGemPile 이 연결되지 않았습니다."); ok = false; }
+            if (submissionZone == null) { Debug.LogError("[GameUIController] submissionZone 이 연결되지 않았습니다."); ok = false; }
+            if (timerView == null) { Debug.LogError("[GameUIController] timerView 가 연결되지 않았습니다."); ok = false; }
+            if (drawAccumulator == null) { Debug.LogError("[GameUIController] drawAccumulator 가 연결되지 않았습니다."); ok = false; }
+            if (resultPanel == null) { Debug.LogError("[GameUIController] resultPanel 이 연결되지 않았습니다."); ok = false; }
+            if (dragController == null) { Debug.LogError("[GameUIController] dragController 가 연결되지 않았습니다."); ok = false; }
+            // aiSubmitAnimator, gemFlightAnimator는 선택사항 — 없으면 즉시 표시 폴백.
 
             return ok;
         }
@@ -157,17 +165,19 @@ namespace Guskapaska.UI
             aiGemPile.SetCount(0);
             coinGridView.SetRemaining(state.CenterGems);
 
-            // 라운드 종속 뷰들 초기화.
+            // 비행 동기화용 상태 캐시.
+            _lastDisplayedPlayerGems = 0;
+            _lastDisplayedAiGems = 0;
+            _lastDisplayedCenterGems = state.CenterGems;
+
             submissionZone.Clear();
             drawAccumulator.SetCoins(0);
             resultPanel.Hide();
 
             UpdateRoundLabel(1);
 
-            // 손패 렌더링 — 딜 애니메이션 사용 여부에 따라 분기.
             if (useDealAnimationAtMatchStart)
             {
-                // 딜 애니메이션 중에는 드래그 입력 차단.
                 if (dragController != null)
                 {
                     dragController.SetAllInteractable(false);
@@ -187,15 +197,11 @@ namespace Guskapaska.UI
             }
         }
 
-        // 매치 시작 시 양쪽 손패를 동시에 딜 + 종료 후 드래그 등록.
         private IEnumerator DealMatchStartHands(GameState state)
         {
-            // 양쪽을 동시에 시작하되 플레이어 손패 종료를 기준으로 대기.
-            // (양쪽 카드 수와 stagger 설정이 같다면 동시에 끝남.)
             StartCoroutine(aiHandView.RenderWithDealAnimation(state.AiHand.Cards));
             yield return playerHandView.RenderWithDealAnimation(state.PlayerHand.Cards);
 
-            // 딜 종료 후 드래그 등록.
             if (dragController != null)
             {
                 dragController.RegisterPlayerCards();
@@ -229,7 +235,6 @@ namespace Guskapaska.UI
 
         private void OnPlayerCardSubmitted(Card card)
         {
-            // 슬라이드 애니메이션 중이라면 코루틴이 ShowPlayerCard를 호출할 책임을 진다.
             if (_animatingSubmission == null)
             {
                 submissionZone.ShowPlayerCard(card);
@@ -246,11 +251,8 @@ namespace Guskapaska.UI
 
         private void OnAiCardSubmitted(Card card)
         {
-            // AI 손패에서 카드 하나를 즉시 제거. 비행 카드는 별도 인스턴스.
             aiHandView.Render(gameManager.State.AiHand.Cards);
 
-            // AiSubmitAnimator가 있으면 비행 애니메이션 시작.
-            // 비행 도착 시 SubmissionZoneView.ShowAiCard를 콜백으로 호출.
             if (aiSubmitAnimator != null)
             {
                 StartCoroutine(aiSubmitAnimator.AnimateAiSubmit(card,
@@ -258,14 +260,12 @@ namespace Guskapaska.UI
             }
             else
             {
-                // 폴백: 애니메이터 없음 → 즉시 표시.
                 submissionZone.ShowAiCard(card);
             }
         }
 
         private void OnRoundResolved(RoundOutcome outcome)
         {
-            // 양쪽 손패 재렌더링 (패자 카드 이동 반영).
             playerHandView.Render(gameManager.State.PlayerHand.Cards);
             aiHandView.Render(gameManager.State.AiHand.Cards);
 
@@ -284,9 +284,47 @@ namespace Guskapaska.UI
 
         private void OnGemsChanged(int player, int ai, int center)
         {
-            playerGemPile.SetCount(player);
-            aiGemPile.SetCount(ai);
-            coinGridView.SetRemaining(center);
+            // 변화량 계산.
+            int playerDelta = player - _lastDisplayedPlayerGems;
+            int aiDelta = ai - _lastDisplayedAiGems;
+
+            // 누가 가져갔는지 판단. 한 라운드에 한쪽만 가져가므로 두 변화량이 동시에 양수가 될 수 없음.
+            // (무승부 → 누구도 가져가지 않음, 변화량 모두 0)
+            bool winnerIsPlayer = playerDelta > 0;
+            bool winnerIsAi = aiDelta > 0;
+            int gemsTaken = Mathf.Max(playerDelta, aiDelta);
+
+            // 비행 애니메이션이 가능한 경우에만 시도.
+            if (gemFlightAnimator != null && (winnerIsPlayer || winnerIsAi) && gemsTaken > 0)
+            {
+                // 새 카운트값을 클로저로 캡처해서 도착 시 적용.
+                int newPlayer = player;
+                int newAi = ai;
+                int newCenter = center;
+
+                gemFlightAnimator.StartGemAcquisition(gemsTaken, winnerIsPlayer, onArrived: () =>
+                {
+                    playerGemPile.SetCount(newPlayer);
+                    aiGemPile.SetCount(newAi);
+                    coinGridView.SetRemaining(newCenter);
+
+                    // 도착 시점에 표시된 값을 캐시 갱신.
+                    _lastDisplayedPlayerGems = newPlayer;
+                    _lastDisplayedAiGems = newAi;
+                    _lastDisplayedCenterGems = newCenter;
+                });
+            }
+            else
+            {
+                // 폴백: 즉시 갱신.
+                playerGemPile.SetCount(player);
+                aiGemPile.SetCount(ai);
+                coinGridView.SetRemaining(center);
+
+                _lastDisplayedPlayerGems = player;
+                _lastDisplayedAiGems = ai;
+                _lastDisplayedCenterGems = center;
+            }
         }
 
         private void OnMatchEnded(MatchResult result)
@@ -312,7 +350,6 @@ namespace Guskapaska.UI
 
             Card boundCard = card.CardView.BoundCard;
 
-            // 게임 로직 호출 BEFORE에 드래그 입력 차단 — AI 카드를 잡을 수 없도록.
             if (dragController != null)
             {
                 dragController.SetAllInteractable(false);
@@ -320,10 +357,8 @@ namespace Guskapaska.UI
 
             _animatingSubmission = card;
 
-            // 시각 슬라이드 시작.
             StartCoroutine(submissionZone.AnimatePlayerCardSubmission(boundCard, card.transform));
 
-            // 게임 로직 진행.
             gameManager.OnPlayerSubmit(boundCard);
         }
 
