@@ -4285,9 +4285,9 @@ MonoBehaviour:
   faceUp: 0
   interactable: 0
   useFanLayout: 1
-  cardSpacing: 130
-  fanRadius: -700
-  fanTotalAngleDegrees: 30
+  cardSpacing: 80
+  fanRadius: -1000
+  anglePerCard: 7
   fanOpensUpward: 1
   arcAngleDegrees: 10
   arcHeight: -40
@@ -4395,9 +4395,9 @@ MonoBehaviour:
   faceUp: 1
   interactable: 1
   useFanLayout: 1
-  cardSpacing: 130
-  fanRadius: 700
-  fanTotalAngleDegrees: 30
+  cardSpacing: 80
+  fanRadius: 1000
+  anglePerCard: 7
   fanOpensUpward: 1
   arcAngleDegrees: 10
   arcHeight: 40
