@@ -43,17 +43,26 @@ namespace Guskapaska.UI
         [Tooltip("보석 비행 + 마리오 손 애니메이션을 담당하는 컴포넌트.")]
         [SerializeField] private GemFlightAnimator gemFlightAnimator;
 
+        [Tooltip("타이머가 3초 이하일 때 화면 중앙에 표시되는 카운트다운 오버레이.")]
+        [SerializeField] private CountdownOverlay countdownOverlay;
+
         [Header("Match Start Animation")]
         [SerializeField] private bool useDealAnimationAtMatchStart = true;
+
+        [Header("Countdown Settings")]
+        [Tooltip("이 초 이하로 떨어지면 카운트다운 오버레이가 활성화된다.")]
+        [SerializeField] private int countdownThreshold = 3;
 
         private bool _subscribed;
         private CardInteractable _animatingSubmission;
 
-        // 보석 비행 애니메이션 동기화를 위해 마지막으로 화면에 반영된 카운트를 추적.
-        // OnGemsChanged 시 이 값과 새 값의 차이로 누가 얼마를 가져갔는지 계산.
         private int _lastDisplayedPlayerGems;
         private int _lastDisplayedAiGems;
         private int _lastDisplayedCenterGems;
+
+        // 카운트다운 오버레이 중복 호출 방지용 — 마지막으로 표시한 정수 초.
+        // OnTimerTick은 매 프레임 호출되므로 정수 초가 바뀌는 순간에만 트리거해야 한다.
+        private int _lastCountdownNumber = int.MaxValue;
 
         private void Start()
         {
@@ -66,7 +75,6 @@ namespace Guskapaska.UI
 
             SubscribeEvents();
 
-            // §18: 강제 동기화.
             if (gameManager != null && gameManager.State != null)
             {
                 OnMatchStarted(gameManager.State);
@@ -86,18 +94,18 @@ namespace Guskapaska.UI
         {
             bool ok = true;
 
-            if (gameManager == null) { Debug.LogError("[GameUIController] gameManager 가 연결되지 않았습니다."); ok = false; }
-            if (playerHandView == null) { Debug.LogError("[GameUIController] playerHandView 가 연결되지 않았습니다."); ok = false; }
-            if (aiHandView == null) { Debug.LogError("[GameUIController] aiHandView 가 연결되지 않았습니다."); ok = false; }
-            if (coinGridView == null) { Debug.LogError("[GameUIController] coinGridView 가 연결되지 않았습니다."); ok = false; }
-            if (playerGemPile == null) { Debug.LogError("[GameUIController] playerGemPile 이 연결되지 않았습니다."); ok = false; }
-            if (aiGemPile == null) { Debug.LogError("[GameUIController] aiGemPile 이 연결되지 않았습니다."); ok = false; }
-            if (submissionZone == null) { Debug.LogError("[GameUIController] submissionZone 이 연결되지 않았습니다."); ok = false; }
-            if (timerView == null) { Debug.LogError("[GameUIController] timerView 가 연결되지 않았습니다."); ok = false; }
-            if (drawAccumulator == null) { Debug.LogError("[GameUIController] drawAccumulator 가 연결되지 않았습니다."); ok = false; }
-            if (resultPanel == null) { Debug.LogError("[GameUIController] resultPanel 이 연결되지 않았습니다."); ok = false; }
-            if (dragController == null) { Debug.LogError("[GameUIController] dragController 가 연결되지 않았습니다."); ok = false; }
-            // aiSubmitAnimator, gemFlightAnimator는 선택사항 — 없으면 즉시 표시 폴백.
+            if (gameManager == null)         { Debug.LogError("[GameUIController] gameManager 가 연결되지 않았습니다."); ok = false; }
+            if (playerHandView == null)      { Debug.LogError("[GameUIController] playerHandView 가 연결되지 않았습니다."); ok = false; }
+            if (aiHandView == null)          { Debug.LogError("[GameUIController] aiHandView 가 연결되지 않았습니다."); ok = false; }
+            if (coinGridView == null)        { Debug.LogError("[GameUIController] coinGridView 가 연결되지 않았습니다."); ok = false; }
+            if (playerGemPile == null)       { Debug.LogError("[GameUIController] playerGemPile 이 연결되지 않았습니다."); ok = false; }
+            if (aiGemPile == null)           { Debug.LogError("[GameUIController] aiGemPile 이 연결되지 않았습니다."); ok = false; }
+            if (submissionZone == null)      { Debug.LogError("[GameUIController] submissionZone 이 연결되지 않았습니다."); ok = false; }
+            if (timerView == null)           { Debug.LogError("[GameUIController] timerView 가 연결되지 않았습니다."); ok = false; }
+            if (drawAccumulator == null)     { Debug.LogError("[GameUIController] drawAccumulator 가 연결되지 않았습니다."); ok = false; }
+            if (resultPanel == null)         { Debug.LogError("[GameUIController] resultPanel 이 연결되지 않았습니다."); ok = false; }
+            if (dragController == null)      { Debug.LogError("[GameUIController] dragController 가 연결되지 않았습니다."); ok = false; }
+            // aiSubmitAnimator, gemFlightAnimator, countdownOverlay는 선택사항.
 
             return ok;
         }
@@ -160,12 +168,10 @@ namespace Guskapaska.UI
 
         private void OnMatchStarted(GameState state)
         {
-            // 보석/코인 상태 초기화.
             playerGemPile.SetCount(0);
             aiGemPile.SetCount(0);
             coinGridView.SetRemaining(state.CenterGems);
 
-            // 비행 동기화용 상태 캐시.
             _lastDisplayedPlayerGems = 0;
             _lastDisplayedAiGems = 0;
             _lastDisplayedCenterGems = state.CenterGems;
@@ -176,13 +182,19 @@ namespace Guskapaska.UI
 
             UpdateRoundLabel(1);
 
+            // 카운트다운 추적 상태 초기화.
+            _lastCountdownNumber = int.MaxValue;
+            if (countdownOverlay != null)
+            {
+                countdownOverlay.HideInstant();
+            }
+
             if (useDealAnimationAtMatchStart)
             {
                 if (dragController != null)
                 {
                     dragController.SetAllInteractable(false);
                 }
-
                 StartCoroutine(DealMatchStartHands(state));
             }
             else
@@ -216,6 +228,14 @@ namespace Guskapaska.UI
 
             UpdateRoundLabel(roundNumber);
 
+            // 새 라운드 시작 → 카운트다운 추적 상태도 초기화 (이전 라운드의 1초가 다음 라운드 14초로
+            // 점프하면서 카운트다운이 다시 트리거되도록).
+            _lastCountdownNumber = int.MaxValue;
+            if (countdownOverlay != null)
+            {
+                countdownOverlay.HideInstant();
+            }
+
             if (dragController != null)
             {
                 dragController.SetAllInteractable(true);
@@ -226,10 +246,29 @@ namespace Guskapaska.UI
         {
             timerView.SetTime(secondsRemaining);
             timerView.SetUrgent(secondsRemaining <= 3f);
+
+            // 카운트다운 오버레이 트리거.
+            // TimerView와 동일한 올림 처리로 정수 초를 계산.
+            int displaySeconds = secondsRemaining < 0f ? 0 : Mathf.CeilToInt(secondsRemaining);
+
+            // 임계값(기본 3) 이하이고, 이전 프레임의 표시 초와 다를 때만 호출.
+            // 0초는 표시하지 않음 (시간 만료 시점에 큰 0이 뜨는 건 어색함).
+            if (displaySeconds <= countdownThreshold
+                && displaySeconds > 0
+                && displaySeconds != _lastCountdownNumber)
+            {
+                _lastCountdownNumber = displaySeconds;
+                if (countdownOverlay != null)
+                {
+                    countdownOverlay.ShowNumber(displaySeconds);
+                }
+            }
         }
 
         private void OnCountdownTriggered()
         {
+            // GameEvents의 OnCountdownTriggered는 별도의 트리거 이벤트.
+            // 현재 구현은 OnTimerTick에서 직접 카운트다운을 띄우므로 여기서는 로그만.
             Debug.Log("[UI] Countdown triggered");
         }
 
@@ -284,20 +323,15 @@ namespace Guskapaska.UI
 
         private void OnGemsChanged(int player, int ai, int center)
         {
-            // 변화량 계산.
             int playerDelta = player - _lastDisplayedPlayerGems;
             int aiDelta = ai - _lastDisplayedAiGems;
 
-            // 누가 가져갔는지 판단. 한 라운드에 한쪽만 가져가므로 두 변화량이 동시에 양수가 될 수 없음.
-            // (무승부 → 누구도 가져가지 않음, 변화량 모두 0)
             bool winnerIsPlayer = playerDelta > 0;
             bool winnerIsAi = aiDelta > 0;
             int gemsTaken = Mathf.Max(playerDelta, aiDelta);
 
-            // 비행 애니메이션이 가능한 경우에만 시도.
             if (gemFlightAnimator != null && (winnerIsPlayer || winnerIsAi) && gemsTaken > 0)
             {
-                // 새 카운트값을 클로저로 캡처해서 도착 시 적용.
                 int newPlayer = player;
                 int newAi = ai;
                 int newCenter = center;
@@ -308,7 +342,6 @@ namespace Guskapaska.UI
                     aiGemPile.SetCount(newAi);
                     coinGridView.SetRemaining(newCenter);
 
-                    // 도착 시점에 표시된 값을 캐시 갱신.
                     _lastDisplayedPlayerGems = newPlayer;
                     _lastDisplayedAiGems = newAi;
                     _lastDisplayedCenterGems = newCenter;
@@ -316,7 +349,6 @@ namespace Guskapaska.UI
             }
             else
             {
-                // 폴백: 즉시 갱신.
                 playerGemPile.SetCount(player);
                 aiGemPile.SetCount(ai);
                 coinGridView.SetRemaining(center);
@@ -332,6 +364,12 @@ namespace Guskapaska.UI
             if (dragController != null)
             {
                 dragController.SetAllInteractable(false);
+            }
+
+            // 매치 종료 시 카운트다운 오버레이는 즉시 숨김.
+            if (countdownOverlay != null)
+            {
+                countdownOverlay.HideInstant();
             }
 
             resultPanel.Show(result);
@@ -350,6 +388,7 @@ namespace Guskapaska.UI
 
             Card boundCard = card.CardView.BoundCard;
 
+            // 드래그 입력 즉시 차단 (AI 카드 빼앗기 방지).
             if (dragController != null)
             {
                 dragController.SetAllInteractable(false);
@@ -357,8 +396,14 @@ namespace Guskapaska.UI
 
             _animatingSubmission = card;
 
-            StartCoroutine(submissionZone.AnimatePlayerCardSubmission(boundCard, card.transform));
+            // 드래그된 카드의 현재 월드 위치와 스케일을 슬라이드 시작점으로 사용.
+            Vector3 startWorldPos = card.transform.position;
+            Vector3 startScale = card.transform.localScale;
 
+            // 시각 슬라이드 시작 (임시 카드 인스턴스가 슬라이드, 원본 카드는 건드리지 않음).
+            StartCoroutine(submissionZone.AnimatePlayerCardSubmission(boundCard, startWorldPos, startScale));
+
+            // 게임 로직 진행 — 손패에서 카드 제거 + AI 자동 제출.
             gameManager.OnPlayerSubmit(boundCard);
         }
 

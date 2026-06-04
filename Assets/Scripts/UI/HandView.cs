@@ -7,10 +7,9 @@ using Guskapaska.Util;
 namespace Guskapaska.UI
 {
     /// <summary>
-    /// Renders a row of cards for either the player or the AI hand.
-    /// Stage 3 uses a straight-line layout; the fan layout is added in Stage 5 Branch 5.
-    /// Stage 5 Branch 3 adds a deal animation that slides cards in from outside the screen
-    /// to their layout position with a stagger.
+    /// Renders a hand of cards as a fan that always spreads to fit the current
+    /// number of cards. The spread uses a per-card angle increment so the visual
+    /// gap between adjacent cards stays consistent regardless of hand size.
     /// </summary>
     public class HandView : MonoBehaviour
     {
@@ -20,42 +19,46 @@ namespace Guskapaska.UI
         [SerializeField] private bool faceUp = true;
 
         [Header("Interaction")]
-        [Tooltip("이 손패의 카드들이 호버/드래그 입력을 받는지 여부. 플레이어 핸드는 true, AI 핸드는 false.")]
+        [Tooltip("이 손패의 카드들이 호버/드래그 입력을 받는지 여부.")]
         [SerializeField] private bool interactable = true;
 
         [Header("Fan Layout")]
+        [SerializeField] private bool useFanLayout = true;
         [SerializeField] private float cardSpacing = 80f;
+
+        [Tooltip("부채꼴 호의 가상 반지름(픽셀). 작을수록 강하게 휜다. 권장 700~1200.")]
+        [SerializeField] private float fanRadius = 1000f;
+
+        [Tooltip("카드 사이의 각도 간격(도). 카드 수에 비례해서 전체 부채꼴 폭이 변한다. 권장 6~10도.")]
+        [SerializeField] private float anglePerCard = 7f;
+
+        [Tooltip("부채꼴이 펼쳐지는 방향. true면 손패 아래에서 위로(플레이어), false면 위에서 아래(AI).")]
+        [SerializeField] private bool fanOpensUpward = true;
+
+        // 레거시 호환.
         [SerializeField] private float arcAngleDegrees = 0f;
         [SerializeField] private float arcHeight = 0f;
 
         [Header("Deal Animation")]
-        [Tooltip("매치 시작 시 카드가 화면 밖에서 손패로 슬라이드 인 하는 지속 시간(초).")]
         [SerializeField] private float dealDurationPerCard = 0.4f;
-
-        [Tooltip("카드 사이의 딜 시작 간격(초). 카드들이 순차적으로 등장하도록 함.")]
         [SerializeField] private float dealStagger = 0.08f;
-
-        [Tooltip("딜 시작 시 카드가 위치하는 시작점의 X 오프셋(픽셀). 음수면 왼쪽 밖에서 시작.")]
         [SerializeField] private float dealStartOffsetX = -800f;
-
-        [Tooltip("딜 시작 시 카드가 위치하는 시작점의 Y 오프셋(픽셀). 0이면 손패와 같은 높이에서 시작.")]
         [SerializeField] private float dealStartOffsetY = 0f;
 
         private readonly List<CardView> _activeViews = new List<CardView>();
+
+        // 진행 중인 딜 코루틴 핸들. 새 Render 호출 시 강제 중단.
+        private readonly List<Coroutine> _dealCoroutines = new List<Coroutine>();
 
         public IReadOnlyList<CardView> ActiveViews => _activeViews;
         public bool Interactable => interactable;
 
         private void OnDisable()
         {
-            // 진행 중인 딜 트윈 정리.
+            CancelAllDealCoroutines();
             TweenRunner.CancelAll(this);
         }
 
-        /// <summary>
-        /// Render the given cards immediately at their final layout positions.
-        /// Used for incremental updates within a round.
-        /// </summary>
         public void Render(IReadOnlyList<Card> cards)
         {
             if (cards == null)
@@ -64,37 +67,61 @@ namespace Guskapaska.UI
                 return;
             }
 
+            // 진행 중인 딜 코루틴이 있으면 강제 중단 — 그래야 새 Render가 위치를 확정할 수 있다.
+            CancelAllDealCoroutines();
+
             EnsureViewCount(cards.Count);
 
             int total = cards.Count;
-            float startX = -((total - 1) * cardSpacing) * 0.5f;
 
+            // 풀 전체 일괄 정리.
+            for (int i = 0; i < _activeViews.Count; i++)
+            {
+                CardView view = _activeViews[i];
+                if (view == null) continue;
+
+                CardInteractable ci = view.GetComponent<CardInteractable>();
+                if (ci != null) ci.ResetInteractionState();
+
+                ReclaimToContainer(view);
+                view.transform.SetSiblingIndex(i);
+            }
+
+            // 사용할 카드 배치.
             for (int i = 0; i < total; i++)
             {
                 CardView view = _activeViews[i];
-                ReclaimToContainer(view);
 
                 view.gameObject.SetActive(true);
                 view.Bind(cards[i]);
                 view.SetFaceUp(faceUp);
                 ApplyInteractableToView(view);
 
-                ApplyLayoutAt(view, i, total, startX);
+                ApplyLayoutAt(view, i, total);
 
-                // rest 상태 캡처 — 호버/드래그/복귀의 기준점.
                 CardInteractable ci = view.GetComponent<CardInteractable>();
-                if (ci != null)
+                if (ci != null) ci.CaptureRestState();
+            }
+
+            // 남는 카드 비활성화.
+            for (int i = total; i < _activeViews.Count; i++)
+            {
+                CardView view = _activeViews[i];
+                if (view == null) continue;
+
+                RectTransform rt = view.GetComponent<RectTransform>();
+                if (rt != null)
                 {
-                    ci.CaptureRestState();
+                    rt.anchoredPosition = Vector2.zero;
+                    rt.localRotation = Quaternion.identity;
+                    rt.localScale = Vector3.one;
                 }
+
+                view.Clear();
+                view.gameObject.SetActive(false);
             }
         }
 
-        /// <summary>
-        /// Render the given cards with a deal-in animation: each card starts from an
-        /// offscreen offset and slides to its layout position, with a stagger between cards.
-        /// Used at match start.
-        /// </summary>
         public IEnumerator RenderWithDealAnimation(IReadOnlyList<Card> cards)
         {
             if (cards == null)
@@ -103,144 +130,160 @@ namespace Guskapaska.UI
                 yield break;
             }
 
+            // 이전 딜이 진행 중이면 모두 중단 (안전망).
+            CancelAllDealCoroutines();
+
             EnsureViewCount(cards.Count);
 
             int total = cards.Count;
-            float startX = -((total - 1) * cardSpacing) * 0.5f;
-
-            // 카드별로 트윈을 동시에 시작하되, 시작 시점만 stagger로 어긋나게 한다.
-            // 마지막 카드의 트윈이 끝날 때까지 기다린 후 코루틴을 종료한다.
             float totalDuration = (total - 1) * dealStagger + dealDurationPerCard;
 
-            for (int i = 0; i < total; i++)
-            {
-                CardView view = _activeViews[i];
-                ReclaimToContainer(view);
-
-                view.gameObject.SetActive(true);
-                view.Bind(cards[i]);
-                view.SetFaceUp(faceUp);
-                ApplyInteractableToView(view);
-
-                // 최종 레이아웃 위치 계산.
-                RectTransform rt = view.GetComponent<RectTransform>();
-                float finalX = startX + i * cardSpacing;
-                float finalY = 0f;
-                float finalAngle = 0f;
-
-                if (Mathf.Abs(arcAngleDegrees) > 0.0001f && total > 1)
-                {
-                    float t = (i / (float)(total - 1)) - 0.5f;
-                    finalAngle = -t * arcAngleDegrees;
-                    finalY = -Mathf.Abs(t) * arcHeight;
-                }
-
-                Vector3 finalPos = new Vector3(finalX, finalY, 0f);
-                Vector3 startPos = finalPos + new Vector3(dealStartOffsetX, dealStartOffsetY, 0f);
-
-                // 시작 위치/회전/스케일로 즉시 배치.
-                rt.anchoredPosition = new Vector2(startPos.x, startPos.y);
-                rt.localRotation = Quaternion.Euler(0f, 0f, finalAngle);
-                rt.localScale = Vector3.one;
-
-                // 카드 i에 대해 stagger만큼 지연 후 트윈 시작.
-                // 별도 코루틴으로 띄워야 다음 카드의 stagger 처리가 진행된다.
-                StartCoroutine(DealOneCard(view, rt, startPos, finalPos, i * dealStagger));
-            }
-
-            // 모든 카드의 트윈이 끝날 때까지 대기.
-            // 마지막 카드 = stagger * (total-1) + dealDurationPerCard 시간 후 종료.
-            yield return new WaitForSeconds(totalDuration);
-
-            // 모든 카드의 rest 상태를 최종 위치 기준으로 캡처.
-            // (트윈 도중에는 위치가 흐트러져 있어 캡처하면 잘못된 rest가 잡힌다.)
-            for (int i = 0; i < total; i++)
+            for (int i = 0; i < _activeViews.Count; i++)
             {
                 CardView view = _activeViews[i];
                 if (view == null) continue;
 
                 CardInteractable ci = view.GetComponent<CardInteractable>();
-                if (ci != null)
+                if (ci != null) ci.ResetInteractionState();
+
+                ReclaimToContainer(view);
+                view.transform.SetSiblingIndex(i);
+            }
+
+            for (int i = 0; i < total; i++)
+            {
+                CardView view = _activeViews[i];
+                view.gameObject.SetActive(true);
+                view.Bind(cards[i]);
+                view.SetFaceUp(faceUp);
+                ApplyInteractableToView(view);
+
+                Vector3 finalPos;
+                float finalAngle;
+                ComputeLayoutAt(i, total, out finalPos, out finalAngle);
+
+                Vector3 startPos = finalPos + new Vector3(dealStartOffsetX, dealStartOffsetY, 0f);
+
+                RectTransform rt = view.GetComponent<RectTransform>();
+                rt.anchoredPosition = new Vector2(startPos.x, startPos.y);
+                rt.localRotation = Quaternion.identity;
+                rt.localScale = Vector3.one;
+
+                // 딜 코루틴 핸들을 보관하여 필요 시 중단할 수 있게 한다.
+                Coroutine c = StartCoroutine(DealOneCard(view, rt, startPos, finalPos, finalAngle, i * dealStagger));
+                _dealCoroutines.Add(c);
+            }
+
+            for (int i = total; i < _activeViews.Count; i++)
+            {
+                CardView view = _activeViews[i];
+                if (view == null) continue;
+
+                RectTransform rt = view.GetComponent<RectTransform>();
+                if (rt != null)
                 {
-                    ci.CaptureRestState();
+                    rt.anchoredPosition = Vector2.zero;
+                    rt.localRotation = Quaternion.identity;
+                    rt.localScale = Vector3.one;
                 }
+                view.Clear();
+                view.gameObject.SetActive(false);
+            }
+
+            // 모든 딜 코루틴 종료 대기.
+            yield return new WaitForSeconds(totalDuration);
+
+            // 딜이 끝났으니 핸들 리스트 비움.
+            _dealCoroutines.Clear();
+
+            // 핵심: 딜 종료 후 모든 카드의 최종 위치를 한 번 더 강제 적용.
+            // 부동소수점 오차나 도중 중단 등으로 어긋났을 가능성을 차단한다.
+            for (int i = 0; i < total; i++)
+            {
+                CardView view = _activeViews[i];
+                if (view == null) continue;
+
+                ApplyLayoutAt(view, i, total);
+
+                CardInteractable ci = view.GetComponent<CardInteractable>();
+                if (ci != null) ci.CaptureRestState();
             }
         }
 
-        /// <summary>
-        /// Hide all active CardViews without destroying them.
-        /// </summary>
         public void Clear()
         {
+            CancelAllDealCoroutines();
+
             foreach (CardView view in _activeViews)
             {
+                if (view == null) continue;
+
+                CardInteractable ci = view.GetComponent<CardInteractable>();
+                if (ci != null) ci.ResetInteractionState();
+
                 ReclaimToContainer(view);
+
+                RectTransform rt = view.GetComponent<RectTransform>();
+                if (rt != null)
+                {
+                    rt.anchoredPosition = Vector2.zero;
+                    rt.localRotation = Quaternion.identity;
+                    rt.localScale = Vector3.one;
+                }
+
                 view.Clear();
                 view.gameObject.SetActive(false);
             }
         }
 
         // ─────────────────────────────────────────────────────────────
-        // 내부 유틸
+        // 레이아웃 계산
         // ─────────────────────────────────────────────────────────────
 
-        // 인스턴스 풀 크기 확장 및 남는 뷰 비활성화.
-        private void EnsureViewCount(int needed)
+        private void ComputeLayoutAt(int index, int total, out Vector3 pos, out float angleZ)
         {
-            while (_activeViews.Count < needed)
+            if (useFanLayout && total > 0)
             {
-                GameObject go = Instantiate(cardViewPrefab, cardContainer);
-                CardView view = go.GetComponent<CardView>();
-                _activeViews.Add(view);
-                ApplyInteractableToView(view);
+                ComputeFanLayoutAt(index, total, out pos, out angleZ);
             }
-
-            for (int i = needed; i < _activeViews.Count; i++)
+            else
             {
-                ReclaimToContainer(_activeViews[i]);
-                _activeViews[i].gameObject.SetActive(false);
+                ComputeLinearLayoutAt(index, total, out pos, out angleZ);
             }
         }
 
-        // 카드 한 장을 최종 위치로 슬라이드 인.
-        private IEnumerator DealOneCard(CardView view, RectTransform rt, Vector3 startPos, Vector3 finalPos, float delay)
+        private void ComputeFanLayoutAt(int index, int total, out Vector3 pos, out float angleZ)
         {
-            // stagger 지연.
-            if (delay > 0f)
+            if (total == 1)
             {
-                yield return new WaitForSeconds(delay);
+                pos = Vector3.zero;
+                angleZ = 0f;
+                return;
             }
 
-            // 트윈 도중 view가 파괴되거나 비활성화되면 안전하게 종료.
-            if (view == null || rt == null)
-            {
-                yield break;
-            }
+            float centerY = fanOpensUpward ? -fanRadius : fanRadius;
 
-            float elapsed = 0f;
-            AnimationCurve curve = EasingCurves.EaseOutQuad;
+            // 카드 사이 각도를 anglePerCard로 고정. 전체 각도 = anglePerCard * (total - 1).
+            float totalSpread = anglePerCard * (total - 1);
+            float halfSpread = totalSpread * 0.5f;
 
-            while (elapsed < dealDurationPerCard)
-            {
-                elapsed += Time.deltaTime;
-                float u = Mathf.Clamp01(elapsed / dealDurationPerCard);
-                float k = curve.Evaluate(u);
+            float angleFromCenter = -halfSpread + index * anglePerCard;
 
-                Vector3 pos = Vector3.LerpUnclamped(startPos, finalPos, k);
-                rt.anchoredPosition = new Vector2(pos.x, pos.y);
+            float visualAngleZ = fanOpensUpward ? -angleFromCenter : angleFromCenter;
 
-                if (rt == null) yield break;
-                yield return null;
-            }
+            float rad = angleFromCenter * Mathf.Deg2Rad;
+            float x = Mathf.Sin(rad) * fanRadius;
+            float yOffset = Mathf.Cos(rad) * fanRadius;
 
-            // 정확한 최종 위치 보장.
-            rt.anchoredPosition = new Vector2(finalPos.x, finalPos.y);
+            float y = yOffset + centerY;
+
+            pos = new Vector3(x, y, 0f);
+            angleZ = visualAngleZ;
         }
 
-        // 카드 i를 즉시 레이아웃 위치에 배치.
-        private void ApplyLayoutAt(CardView view, int index, int total, float startX)
+        private void ComputeLinearLayoutAt(int index, int total, out Vector3 pos, out float angleZ)
         {
-            RectTransform rt = view.GetComponent<RectTransform>();
+            float startX = -((total - 1) * cardSpacing) * 0.5f;
             float x = startX + index * cardSpacing;
             float y = 0f;
             float angle = 0f;
@@ -252,12 +295,79 @@ namespace Guskapaska.UI
                 y = -Mathf.Abs(t) * arcHeight;
             }
 
-            rt.anchoredPosition = new Vector2(x, y);
-            rt.localRotation = Quaternion.Euler(0f, 0f, angle);
+            pos = new Vector3(x, y, 0f);
+            angleZ = angle;
+        }
+
+        private void ApplyLayoutAt(CardView view, int index, int total)
+        {
+            Vector3 pos;
+            float angleZ;
+            ComputeLayoutAt(index, total, out pos, out angleZ);
+
+            RectTransform rt = view.GetComponent<RectTransform>();
+            rt.anchoredPosition = new Vector2(pos.x, pos.y);
+            rt.localRotation = Quaternion.Euler(0f, 0f, angleZ);
             rt.localScale = Vector3.one;
         }
 
-        // CardView 인스턴스의 부모/transform/CanvasGroup을 손패 컨테이너 기준으로 정상화.
+        // ─────────────────────────────────────────────────────────────
+        // 내부 유틸
+        // ─────────────────────────────────────────────────────────────
+
+        // 진행 중인 모든 딜 코루틴을 중단.
+        private void CancelAllDealCoroutines()
+        {
+            for (int i = 0; i < _dealCoroutines.Count; i++)
+            {
+                if (_dealCoroutines[i] != null)
+                {
+                    StopCoroutine(_dealCoroutines[i]);
+                }
+            }
+            _dealCoroutines.Clear();
+        }
+
+        private void EnsureViewCount(int needed)
+        {
+            while (_activeViews.Count < needed)
+            {
+                GameObject go = Instantiate(cardViewPrefab, cardContainer);
+                CardView view = go.GetComponent<CardView>();
+                _activeViews.Add(view);
+                ApplyInteractableToView(view);
+            }
+        }
+
+        private IEnumerator DealOneCard(CardView view, RectTransform rt, Vector3 startPos, Vector3 finalPos, float finalAngle, float delay)
+        {
+            if (delay > 0f) yield return new WaitForSeconds(delay);
+            if (view == null || rt == null) yield break;
+
+            float elapsed = 0f;
+            AnimationCurve curve = EasingCurves.EaseOutQuad;
+            float startAngle = 0f;
+
+            while (elapsed < dealDurationPerCard)
+            {
+                elapsed += Time.deltaTime;
+                float u = Mathf.Clamp01(elapsed / dealDurationPerCard);
+                float k = curve.Evaluate(u);
+
+                Vector3 pos = Vector3.LerpUnclamped(startPos, finalPos, k);
+                rt.anchoredPosition = new Vector2(pos.x, pos.y);
+
+                float angle = Mathf.LerpUnclamped(startAngle, finalAngle, k);
+                rt.localRotation = Quaternion.Euler(0f, 0f, angle);
+
+                if (rt == null) yield break;
+                yield return null;
+            }
+
+            rt.anchoredPosition = new Vector2(finalPos.x, finalPos.y);
+            rt.localRotation = Quaternion.Euler(0f, 0f, finalAngle);
+        }
+
         private void ReclaimToContainer(CardView view)
         {
             if (view == null || cardContainer == null) return;
@@ -275,7 +385,6 @@ namespace Guskapaska.UI
             }
         }
 
-        // 해당 CardView의 CardInteractable에 interactable 정책을 강제 적용.
         private void ApplyInteractableToView(CardView view)
         {
             if (view == null) return;
