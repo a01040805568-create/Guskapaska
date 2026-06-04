@@ -1662,6 +1662,7 @@ RectTransform:
   - {fileID: 11206143}
   - {fileID: 1492720611}
   - {fileID: 688944111}
+  - {fileID: 1607206960}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -2716,6 +2717,7 @@ MonoBehaviour:
   roundLabel: {fileID: 153089466}
   dragController: {fileID: 2035651773}
   aiSubmitAnimator: {fileID: 688944112}
+  gemFlightAnimator: {fileID: 1607206961}
   useDealAnimationAtMatchStart: 1
 --- !u!1 &1562615597
 GameObject:
@@ -2991,6 +2993,68 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1576291451}
   m_CullTransparentMesh: 1
+--- !u!1 &1607206959
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1607206960}
+  - component: {fileID: 1607206961}
+  m_Layer: 5
+  m_Name: 'GemFlightAnimator '
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1607206960
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1607206959}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 960557851}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1607206961
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1607206959}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9aa06c9f656ddf94f90b04c39a8c30d3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Guskapaska.UI.GemFlightAnimator
+  gemPrefab: {fileID: 5988451291479592006, guid: fc888845b8febc64587aa574f0dd1229, type: 3}
+  marioHandPrefab: {fileID: 3392163316885379561, guid: 2ce96229a33fbdc45b9a4599f64169c1, type: 3}
+  playerGemTarget: {fileID: 1232288568}
+  aiGemTarget: {fileID: 1086471355}
+  coinGridView: {fileID: 1722064531}
+  animationContainer: {fileID: 960557851}
+  handStartYOffset: 300
+  gemRiseHeight: 30
+  gemRiseDuration: 0.2
+  handDescendDuration: 0.3
+  handPauseDuration: 0.15
+  handAscendDuration: 0.3
+  gemFlightDuration: 0.5
+  gemFlightArcHeight: 80
 --- !u!1 &1608842655
 GameObject:
   m_ObjectHideFlags: 0
