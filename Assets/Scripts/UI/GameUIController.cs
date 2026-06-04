@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -35,10 +36,15 @@ namespace Guskapaska.UI
         [Header("Drag")]
         [SerializeField] private DragController dragController;
 
-        private bool _subscribed;
+        [Header("Animators")]
+        [Tooltip("AI 카드 포물선 비행 애니메이션을 담당하는 컴포넌트.")]
+        [SerializeField] private AiSubmitAnimator aiSubmitAnimator;
 
-        // 슬라이드 애니메이션이 진행 중인 카드. OnPlayerCardSubmitted가 발화되면 그 카드의 데이터는
-        // 슬라이드 코루틴이 처리할 것이므로 즉시 ShowPlayerCard를 호출하면 안 된다 (이중 표시 방지).
+        [Header("Match Start Animation")]
+        [Tooltip("매치 시작 시 카드 딜 애니메이션을 사용할지 여부. true면 RenderWithDealAnimation 사용.")]
+        [SerializeField] private bool useDealAnimationAtMatchStart = true;
+
+        private bool _subscribed;
         private CardInteractable _animatingSubmission;
 
         private void Start()
@@ -52,7 +58,7 @@ namespace Guskapaska.UI
 
             SubscribeEvents();
 
-            // §18: 구독 시점에 이미 발화된 MatchStarted를 놓쳤을 수 있으므로 강제 동기화.
+            // §18: 강제 동기화.
             if (gameManager != null && gameManager.State != null)
             {
                 OnMatchStarted(gameManager.State);
@@ -83,6 +89,7 @@ namespace Guskapaska.UI
             if (drawAccumulator == null)     { Debug.LogError("[GameUIController] drawAccumulator 가 연결되지 않았습니다."); ok = false; }
             if (resultPanel == null)         { Debug.LogError("[GameUIController] resultPanel 이 연결되지 않았습니다."); ok = false; }
             if (dragController == null)      { Debug.LogError("[GameUIController] dragController 가 연결되지 않았습니다."); ok = false; }
+            // aiSubmitAnimator는 선택사항 — 없으면 즉시 표시로 폴백.
 
             return ok;
         }
@@ -93,10 +100,7 @@ namespace Guskapaska.UI
 
         private void SubscribeEvents()
         {
-            if (_subscribed || gameManager == null || gameManager.Events == null)
-            {
-                return;
-            }
+            if (_subscribed || gameManager == null || gameManager.Events == null) return;
 
             GameEvents events = gameManager.Events;
             events.OnMatchStarted += OnMatchStarted;
@@ -120,10 +124,7 @@ namespace Guskapaska.UI
 
         private void UnsubscribeEvents()
         {
-            if (!_subscribed || gameManager == null || gameManager.Events == null)
-            {
-                return;
-            }
+            if (!_subscribed || gameManager == null || gameManager.Events == null) return;
 
             GameEvents events = gameManager.Events;
             events.OnMatchStarted -= OnMatchStarted;
@@ -151,22 +152,54 @@ namespace Guskapaska.UI
 
         private void OnMatchStarted(GameState state)
         {
-            playerHandView.Render(state.PlayerHand.Cards);
-            aiHandView.Render(state.AiHand.Cards);
-
+            // 보석/코인 상태 초기화.
             playerGemPile.SetCount(0);
             aiGemPile.SetCount(0);
             coinGridView.SetRemaining(state.CenterGems);
 
+            // 라운드 종속 뷰들 초기화.
             submissionZone.Clear();
             drawAccumulator.SetCoins(0);
             resultPanel.Hide();
 
             UpdateRoundLabel(1);
 
+            // 손패 렌더링 — 딜 애니메이션 사용 여부에 따라 분기.
+            if (useDealAnimationAtMatchStart)
+            {
+                // 딜 애니메이션 중에는 드래그 입력 차단.
+                if (dragController != null)
+                {
+                    dragController.SetAllInteractable(false);
+                }
+
+                StartCoroutine(DealMatchStartHands(state));
+            }
+            else
+            {
+                playerHandView.Render(state.PlayerHand.Cards);
+                aiHandView.Render(state.AiHand.Cards);
+
+                if (dragController != null)
+                {
+                    dragController.RegisterPlayerCards();
+                }
+            }
+        }
+
+        // 매치 시작 시 양쪽 손패를 동시에 딜 + 종료 후 드래그 등록.
+        private IEnumerator DealMatchStartHands(GameState state)
+        {
+            // 양쪽을 동시에 시작하되 플레이어 손패 종료를 기준으로 대기.
+            // (양쪽 카드 수와 stagger 설정이 같다면 동시에 끝남.)
+            StartCoroutine(aiHandView.RenderWithDealAnimation(state.AiHand.Cards));
+            yield return playerHandView.RenderWithDealAnimation(state.PlayerHand.Cards);
+
+            // 딜 종료 후 드래그 등록.
             if (dragController != null)
             {
                 dragController.RegisterPlayerCards();
+                dragController.SetAllInteractable(true);
             }
         }
 
@@ -177,7 +210,6 @@ namespace Guskapaska.UI
 
             UpdateRoundLabel(roundNumber);
 
-            // 새 라운드 시작 → 카드 다시 드래그 가능.
             if (dragController != null)
             {
                 dragController.SetAllInteractable(true);
@@ -203,27 +235,37 @@ namespace Guskapaska.UI
                 submissionZone.ShowPlayerCard(card);
             }
 
-            // 손패 재렌더링.
             playerHandView.Render(gameManager.State.PlayerHand.Cards);
 
             if (dragController != null)
             {
                 dragController.RegisterPlayerCards();
-                // 안전망 — 이미 OnPlayerCardDropped에서 SetAllInteractable(false)했지만,
-                // 새로 그려진 카드 인스턴스에 대해서도 명시적으로 차단 상태 유지.
                 dragController.SetAllInteractable(false);
             }
         }
 
         private void OnAiCardSubmitted(Card card)
         {
-            submissionZone.ShowAiCard(card);
+            // AI 손패에서 카드 하나를 즉시 제거. 비행 카드는 별도 인스턴스.
             aiHandView.Render(gameManager.State.AiHand.Cards);
+
+            // AiSubmitAnimator가 있으면 비행 애니메이션 시작.
+            // 비행 도착 시 SubmissionZoneView.ShowAiCard를 콜백으로 호출.
+            if (aiSubmitAnimator != null)
+            {
+                StartCoroutine(aiSubmitAnimator.AnimateAiSubmit(card,
+                    onArrived: () => submissionZone.ShowAiCard(card)));
+            }
+            else
+            {
+                // 폴백: 애니메이터 없음 → 즉시 표시.
+                submissionZone.ShowAiCard(card);
+            }
         }
 
         private void OnRoundResolved(RoundOutcome outcome)
         {
-            // 양쪽 손패 재렌더링 (패자 카드 이동 등 반영).
+            // 양쪽 손패 재렌더링 (패자 카드 이동 반영).
             playerHandView.Render(gameManager.State.PlayerHand.Cards);
             aiHandView.Render(gameManager.State.AiHand.Cards);
 
@@ -232,7 +274,6 @@ namespace Guskapaska.UI
                 dragController.RegisterPlayerCards();
             }
 
-            // 슬라이드 추적 상태 초기화.
             _animatingSubmission = null;
         }
 
@@ -271,19 +312,15 @@ namespace Guskapaska.UI
 
             Card boundCard = card.CardView.BoundCard;
 
-            // 핵심 변경 (버그 2 해결):
-            // gameManager.OnPlayerSubmit 호출은 그 안에서 AI 카드 제출까지 동기적으로 진행되며,
-            // 그 과정에서 AI HandView가 잠시 재렌더링되어 AI 카드가 활성 상태가 될 수 있다.
-            // 따라서 게임 로직 호출 BEFORE에 모든 카드를 즉시 입력 차단해야 한다.
+            // 게임 로직 호출 BEFORE에 드래그 입력 차단 — AI 카드를 잡을 수 없도록.
             if (dragController != null)
             {
                 dragController.SetAllInteractable(false);
             }
 
-            // 슬라이드 추적 마커.
             _animatingSubmission = card;
 
-            // 시각 슬라이드 시작 (게임 로직과 별개로 진행).
+            // 시각 슬라이드 시작.
             StartCoroutine(submissionZone.AnimatePlayerCardSubmission(boundCard, card.transform));
 
             // 게임 로직 진행.
