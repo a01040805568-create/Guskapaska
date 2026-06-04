@@ -40,6 +40,9 @@ namespace Guskapaska.UI
         public event Action<CardInteractable> OnDragStarted;
         public event Action<CardInteractable, bool> OnDragEnded;
 
+        /// <summary>Raised when the pointer enters this card while it is interactable and not dragging. For SFX wiring (Stage 6).</summary>
+        public event Action<CardInteractable> OnHoverEntered;
+
         public Vector2 CurrentPointerPosition { get; private set; }
         public CardView CardView => cardView;
         public bool IsDragging => _isDragging;
@@ -149,6 +152,9 @@ namespace Guskapaska.UI
             }
 
             _isHovering = true;
+
+            // 호버 진입 이벤트 발행 (SFX 등 상위 구독자용). interactable & 비드래그 상태에서만 도달.
+            OnHoverEntered?.Invoke(this);
         }
 
         public void OnPointerExit(PointerEventData eventData)
