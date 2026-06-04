@@ -11,6 +11,13 @@ namespace Guskapaska.UI
     /// cards to return to their origin on a failed drop.
     /// All wiring is via Inspector references — no runtime lookups.
     /// </summary>
+    /// <remarks>
+    /// Stage 6 adds aggregate card-input events (<see cref="OnAnyCardDragStarted"/>,
+    /// <see cref="OnAnyCardReturned"/>, <see cref="OnAnyCardHovered"/>) so that sound
+    /// wiring (SfxBindings) can react to player-card input without duplicating the
+    /// per-card subscription lifecycle this controller already owns. These fire only
+    /// for registered player cards, never for AI cards.
+    /// </remarks>
     public class DragController : MonoBehaviour
     {
         [Header("Refs")]
@@ -23,6 +30,15 @@ namespace Guskapaska.UI
         /// subscribers decide how to process the submission.
         /// </summary>
         public event Action<CardInteractable> OnPlayerCardSubmitted;
+
+        /// <summary>Raised when any registered player card begins dragging. For SFX wiring.</summary>
+        public event Action OnAnyCardDragStarted;
+
+        /// <summary>Raised when a dragged player card fails to drop and returns to its origin. For SFX wiring.</summary>
+        public event Action OnAnyCardReturned;
+
+        /// <summary>Raised when the pointer enters any registered, interactable player card. For SFX wiring.</summary>
+        public event Action OnAnyCardHovered;
 
         // 현재 드래그 중인 카드. 드롭 성공 시 null로 정리되어 복귀 로직이 건너뛰어진다.
         private CardInteractable _activeDrag;
@@ -69,6 +85,7 @@ namespace Guskapaska.UI
                 }
                 card.OnDragStarted -= HandleDragStarted;
                 card.OnDragEnded -= HandleDragEnded;
+                card.OnHoverEntered -= HandleHoverEntered;
             }
             _registered.Clear();
             _activeDrag = null;
@@ -114,8 +131,10 @@ namespace Guskapaska.UI
                     // 신규 카드도 같은 흐름으로 처리되어 항상 정확히 한 번만 구독된 상태를 보장한다.
                     card.OnDragStarted -= HandleDragStarted;
                     card.OnDragEnded -= HandleDragEnded;
+                    card.OnHoverEntered -= HandleHoverEntered;
                     card.OnDragStarted += HandleDragStarted;
                     card.OnDragEnded += HandleDragEnded;
+                    card.OnHoverEntered += HandleHoverEntered;
                 }
             }
 
@@ -129,6 +148,7 @@ namespace Guskapaska.UI
                     {
                         card.OnDragStarted -= HandleDragStarted;
                         card.OnDragEnded -= HandleDragEnded;
+                        card.OnHoverEntered -= HandleHoverEntered;
                     }
                     return true;
                 }
@@ -173,6 +193,9 @@ namespace Guskapaska.UI
         private void HandleDragStarted(CardInteractable card)
         {
             _activeDrag = card;
+
+            // 등록된 플레이어 카드의 드래그 시작 → 집계 이벤트로 전달 (SFX 등).
+            OnAnyCardDragStarted?.Invoke();
         }
 
         private void HandleDragEnded(CardInteractable card, bool _)
@@ -182,11 +205,20 @@ namespace Guskapaska.UI
             if (_activeDrag == card)
             {
                 card.ReturnToOrigin();
+
+                // 드롭 실패로 인한 복귀 → 집계 이벤트로 전달 (복귀 SFX 등).
+                OnAnyCardReturned?.Invoke();
             }
             // _activeDrag가 null이라면 HandlePlayerDrop이 먼저 실행되어 정리한 것.
             // 이미 제출된 카드이므로 복귀시키면 안 됨.
 
             _activeDrag = null;
+        }
+
+        private void HandleHoverEntered(CardInteractable card)
+        {
+            // 등록된 플레이어 카드 위로 포인터 진입 → 집계 이벤트로 전달 (호버 SFX 등).
+            OnAnyCardHovered?.Invoke();
         }
 
         private void HandlePlayerDrop(CardInteractable card)
