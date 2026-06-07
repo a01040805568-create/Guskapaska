@@ -21,6 +21,10 @@ namespace Guskapaska.Game
         [SerializeField] private TimerController timerController;
         [SerializeField] private RoundController roundController;
 
+        [Header("Tutorial")]
+        // false면 씬 진입 시 자동 매치를 시작하지 않는다. 튜토리얼은 외부에서 StartTutorialMatch를 호출.
+        [SerializeField] private bool autoStartMatch = true;
+
         /// <summary>Event bus other components can subscribe to.</summary>
         public GameEvents Events { get; private set; }
 
@@ -29,7 +33,7 @@ namespace Guskapaska.Game
 
         // 내부 의존성
         private System.Random _rng;
-        private AiRandomStrategy _aiStrategy;
+        private IAiStrategy _aiStrategy;
         private bool _matchActive;
 
         private void Awake()
@@ -55,47 +59,58 @@ namespace Guskapaska.Game
 
         private void Start()
         {
-            // Stage 2에서는 씬 진입 시 자동으로 매치 시작
-            StartMatch();
+            // 일반 모드에서는 씬 진입 시 자동 시작. 튜토리얼 모드에서는 외부(TutorialController)가 시작한다.
+            if (autoStartMatch)
+            {
+             StartMatch();
+            }
         }
 
         /// <summary>
-        /// Initializes state, builds and shuffles the deck, deals hands,
-        /// wires up controllers, and starts the first round.
+        /// 표준 덱을 셔플·분배하여 일반 매치를 시작한다.
         /// </summary>
         public void StartMatch()
         {
-            // 새 상태 생성
-            State = new GameState(config.TotalGems);
+         State = new GameState(config.TotalGems);
 
-            // 표준 12장 덱 생성 → Deck으로 래핑 → 셔플
-            List<Card> standardSet = CardFactory.CreateStandardSet();
-            Deck deck = new Deck(standardSet);
-            deck.Shuffle(_rng);
+         // 표준 12장 덱 생성 → 셔플 → 5장씩 분배 (남은 2장은 제외)
+         List<Card> standardSet = CardFactory.CreateStandardSet();
+         Deck deck = new Deck(standardSet);
+         deck.Shuffle(_rng);
 
-            // 각 플레이어에게 InitialHandSize만큼 분배 (디자인상 5장씩)
-            List<Card> playerCards = deck.DrawTop(config.InitialHandSize);
-            List<Card> aiCards = deck.DrawTop(config.InitialHandSize);
-            State.PlayerHand.AddRange(playerCards);
-            State.AiHand.AddRange(aiCards);
+         State.PlayerHand.AddRange(deck.DrawTop(config.InitialHandSize));
+         State.AiHand.AddRange(deck.DrawTop(config.InitialHandSize));
 
-            // 00_GameDesign.md §4: 남은 2장은 게임에서 제외 (Deck에 남은 채로 두면 됨)
+         BeginMatch(_aiStrategy);
+        }
 
-            // 컨트롤러 의존성 주입
-            timerController.Initialize(Events, config);
-            roundController.Initialize(State, Events, config, timerController, _aiStrategy, _rng);
+        /// <summary>
+        /// 튜토리얼용 매치를 시작한다. 셔플 대신 지정된 손패를 그대로 사용하고,
+        /// 지정된 AI 전략(보통 ScriptedAiStrategy)을 주입한다.
+        /// </summary>
+        public void StartTutorialMatch(List<Card> playerCards, List<Card> aiCards, IAiStrategy aiStrategy)
+        {
+          State = new GameState(config.TotalGems);
+         State.PlayerHand.AddRange(playerCards);
+         State.AiHand.AddRange(aiCards);
 
-            // 라운드 종료 이벤트 구독
-            Events.OnRoundResolved += HandleRoundResolved;
+         BeginMatch(aiStrategy);
+        }
 
-            // 매치 시작 이벤트 발생
-            Events.RaiseMatchStarted(State);
-            Events.RaiseGemsChanged(State.PlayerGems, State.AiGems, State.CenterGems);
+        // 손패 구성이 끝난 뒤 컨트롤러 주입·이벤트 발생·첫 라운드 시작을 처리하는 공통 로직.
+         private void BeginMatch(IAiStrategy strategy)
+        {
+         timerController.Initialize(Events, config);
+         roundController.Initialize(State, Events, config, timerController, strategy, _rng);
 
-            _matchActive = true;
+         Events.OnRoundResolved += HandleRoundResolved;
 
-            // 첫 라운드 시작
-            roundController.StartRound();
+         Events.RaiseMatchStarted(State);
+         Events.RaiseGemsChanged(State.PlayerGems, State.AiGems, State.CenterGems);
+
+         _matchActive = true;
+
+        roundController.StartRound();
         }
 
         /// <summary>
