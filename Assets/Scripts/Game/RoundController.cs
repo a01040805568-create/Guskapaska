@@ -16,7 +16,7 @@ namespace Guskapaska.Game
         private GameEvents _events;
         private MatchConfig _config;
         private TimerController _timer;
-        private AiRandomStrategy _aiStrategy;
+        private IAiStrategy _aiStrategy;
         private System.Random _rng;
 
         // 라운드 진행 중 임시 상태
@@ -33,7 +33,7 @@ namespace Guskapaska.Game
             GameEvents events,
             MatchConfig config,
             TimerController timer,
-            AiRandomStrategy ai,
+            IAiStrategy ai,
             System.Random rng)
         {
             _state = state;

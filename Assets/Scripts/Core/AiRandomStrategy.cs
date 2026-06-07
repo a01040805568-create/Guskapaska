@@ -7,7 +7,7 @@ namespace Guskapaska.Core
     /// 향후 다른 전략(카드 카운팅, 난이도 등)을 도입할 때 공통 인터페이스를 빼낼 수 있으나
     /// Stage 1 범위에서는 일부러 인터페이스를 만들지 않는다 (불필요한 추상화 회피).
     /// </summary>
-    public class AiRandomStrategy
+    public class AiRandomStrategy : IAiStrategy
     {
         private readonly System.Random _rng;
 

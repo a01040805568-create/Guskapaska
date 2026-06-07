@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using Guskapaska.Core;
 
 namespace Guskapaska.UI
 {
@@ -189,6 +190,29 @@ namespace Guskapaska.UI
         // ─────────────────────────────────────────────────────────────
         // 내부 이벤트 핸들러
         // ─────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// 지정한 모양의 카드만 드래그를 허용하고 나머지는 모두 차단한다.
+        /// 튜토리얼에서 특정 카드만 내도록 유도할 때 사용한다.
+        /// </summary>
+        public void SetInteractableByShape(CardShape allowedShape)
+        {
+            foreach (CardInteractable card in _registered)
+            {
+                if (card == null) continue;
+
+                Card bound = (card.CardView != null) ? card.CardView.BoundCard : null;
+                bool allow = (bound != null) && (bound.Shape == allowedShape);
+
+                card.Interactable = allow;
+
+                // 차단되는 카드는 호버 상태를 강제 해제.
+                if (!allow)
+                {
+                    card.ForceUnhover();
+                }
+            }
+        }
 
         private void HandleDragStarted(CardInteractable card)
         {
