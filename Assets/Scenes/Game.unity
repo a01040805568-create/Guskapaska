@@ -3425,16 +3425,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TutorialController
   gameManager: {fileID: 2146237357}
   dragController: {fileID: 2035651773}
+  timerController: {fileID: 2146237356}
   overlay: {fileID: 1082660558}
-  steps:
-  - bodyText: "\uCCAB \uBC88\uC9F8 \uC548\uB0B4\uC785\uB2C8\uB2E4"
-    highlightTarget: {fileID: 0}
-    advanceTrigger: 0
-    allowPlayerDrag: 0
-  - bodyText: "\uB450 \uBC88\uC9F8 \uC548\uB0B4\uC785\uB2C8\uB2E4"
-    highlightTarget: {fileID: 0}
-    advanceTrigger: 0
-    allowPlayerDrag: 0
+  playerHandHighlight: {fileID: 2106018788}
+  gemPileHighlight: {fileID: 335216723}
+  drawAccumulatorHighlight: {fileID: 977621857}
   beginOnStart: 1
 --- !u!1 &1209240229 stripped
 GameObject:
@@ -5729,6 +5724,7 @@ MonoBehaviour:
   config: {fileID: 11400000, guid: 6930a2f5bbe076c46aee4e924611559a, type: 2}
   timerController: {fileID: 2146237356}
   roundController: {fileID: 2146237355}
+  autoStartMatch: 0
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
