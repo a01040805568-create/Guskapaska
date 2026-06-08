@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Guskapaska.Core;
+using Guskapaska.Util;
 
 namespace Guskapaska.Game
 {
@@ -59,10 +60,10 @@ namespace Guskapaska.Game
 
         private void Start()
         {
-            // 일반 모드에서는 씬 진입 시 자동 시작. 튜토리얼 모드에서는 외부(TutorialController)가 시작한다.
-            if (autoStartMatch)
+            // 튜토리얼 모드면 TutorialController가 매치를 시작하므로 자동 시작하지 않는다.
+            if (!GameLaunchMode.StartInTutorial && autoStartMatch)
             {
-             StartMatch();
+                StartMatch();
             }
         }
 
