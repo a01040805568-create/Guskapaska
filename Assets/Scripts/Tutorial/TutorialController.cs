@@ -355,12 +355,22 @@ namespace Guskapaska.Tutorial
         }
 
         // 타이머가 켜진 다음 프레임에 정지시킨다.
+        // 타이머가 켜진 다음 프레임에 정지시키고, 현재 단계의 입력 게이트를 다시 적용한다.
         private IEnumerator StopTimerNextFrame()
         {
             yield return null;
-            if (_running && timerController != null)
+            if (!_running) yield break;
+
+            if (timerController != null)
             {
                 timerController.StopTimer();
+            }
+
+            // 라운드 전환 시 손패가 재등록(RegisterPlayerCards)되며 게이팅이 풀릴 수 있으므로,
+            // 현재 단계의 게이트를 다시 적용해 의도한 입력 제한을 유지한다.
+            if (_currentIndex >= 0 && _currentIndex < _steps.Count)
+            {
+                ApplyGate(_steps[_currentIndex]);
             }
         }
 
@@ -372,6 +382,23 @@ namespace Guskapaska.Tutorial
         private void HandleRoundResolved(RoundOutcome outcome)
         {
             TryAdvanceOn(TutorialAdvanceTrigger.RoundResolved);
+
+            // 라운드 판정과 같은 사이클에서 손패가 재등록되며 게이트가 풀릴 수 있으므로,
+            // 한 프레임 뒤에 현재 단계의 게이트를 다시 적용한다.
+            if (_running)
+            {
+                StartCoroutine(ReapplyGateNextFrame());
+            }
+        }
+
+        // 한 프레임 뒤에 현재 단계의 입력 게이트를 다시 적용한다.
+        private IEnumerator ReapplyGateNextFrame()
+        {
+            yield return null;
+            if (_running && _currentIndex >= 0 && _currentIndex < _steps.Count)
+            {
+                ApplyGate(_steps[_currentIndex]);
+            }
         }
 
         private void HandleMatchEnded(MatchResult result)
