@@ -54,7 +54,8 @@ namespace Guskapaska.Tutorial
 
         private void Start()
         {
-            if (beginOnStart)
+            // 튜토리얼 모드로 진입했거나, 에디터 단독 테스트 플래그가 켜져 있으면 시작.
+            if (GameLaunchMode.StartInTutorial || beginOnStart)
             {
                 Begin();
             }
@@ -115,6 +116,9 @@ namespace Guskapaska.Tutorial
         {
             if (!_running) return;
             _running = false;
+
+            // 튜토리얼을 봤음을 기록 (완료·건너뛰기 모두).
+            GameSettings.MarkTutorialSeen();
 
             UnsubscribeEvents();
             UnhookOverlay();

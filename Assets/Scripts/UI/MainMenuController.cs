@@ -34,19 +34,25 @@ namespace Guskapaska.UI
             if (settingsButton != null) settingsButton.onClick.AddListener(OnSettingsClicked);
             if (quitButton != null) quitButton.onClick.AddListener(OnQuitClicked);
 
-            // 씬 진입 fade-in은 SceneTransition이 자체 Start에서 처리하므로 여기서 호출하지 않는다.
+            // 첫 실행(플레이·튜토리얼 모두 경험 없음)이면 자동으로 튜토리얼을 시작한다.
+            if (GameSettings.ShouldRecommendTutorial)
+            {
+                OnTutorialClicked();
+            }
         }
 
         private void OnStartClicked()
         {
-            // 페이드 아웃 후 게임 씬 로드 (트랜지션이 없으면 즉시 로드로 폴백).
-            SceneLoader.LoadSceneWithFade(SceneLoader.GameScene, sceneTransition);
+            // 일반 플레이 모드로 진입.
+            GameLaunchMode.StartInTutorial = false;
+            SceneLoader.LoadGame();
         }
 
         private void OnTutorialClicked()
         {
-            // Final wiring deferred to Stage 7 (see 01_ProjectOverview.md stage breakdown).
-            Debug.Log("Tutorial not implemented yet (Stage 7)");
+            // 튜토리얼 모드로 진입.
+            GameLaunchMode.StartInTutorial = true;
+            SceneLoader.LoadGame();
         }
 
         private void OnSettingsClicked()

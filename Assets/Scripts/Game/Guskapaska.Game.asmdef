@@ -2,7 +2,8 @@
     "name": "Guskapaska.Game",
     "rootNamespace": "",
     "references": [
-        "Guskapaska.Core"
+        "Guskapaska.Core",
+        "Guskapaska.Util"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
