@@ -6,9 +6,11 @@ using Guskapaska.Util;
 namespace Guskapaska.UI
 {
     /// <summary>
-    /// Orchestrates the gem acquisition animation:
-    /// rise → Mario hand descends → hand pauses → hand ascends with gems → gems fly to pile.
-    /// Game logic for gem counts is unaffected; only the visual catches up.
+    /// 보석 획득 애니메이션을 총괄한다.
+    /// 승자에 따라 연출이 갈린다:
+    ///  - AI 승리: 보석 솟구침 → 곰발바닥(마리오 손) 하강 → 멈춤 → 손이 보석과 함께 상승 → 보석이 AI 더미로 비행
+    ///  - 플레이어 승리: 보석이 위로 떠오르며 페이드아웃되어 사라짐 (곰발바닥/비행 없음)
+    /// 게임 로직상의 보석 수치에는 영향을 주지 않고, 시각 연출만 뒤따른다.
     /// </summary>
     public class GemFlightAnimator : MonoBehaviour
     {
@@ -16,14 +18,11 @@ namespace Guskapaska.UI
         [Tooltip("비행 보석 프리팹. 작은 시안 사각형 + Image 컴포넌트.")]
         [SerializeField] private GameObject gemPrefab;
 
-        [Tooltip("마리오 손 프리팹. 갈색 placeholder.")]
+        [Tooltip("마리오 손(곰발바닥) 프리팹. 갈색 placeholder.")]
         [SerializeField] private GameObject marioHandPrefab;
 
         [Header("Anchors")]
-        [Tooltip("플레이어의 GemPile 위치 (도착 지점).")]
-        [SerializeField] private RectTransform playerGemTarget;
-
-        [Tooltip("AI의 GemPile 위치 (도착 지점).")]
+        [Tooltip("AI의 GemPile 위치 (AI 승리 시 보석 도착 지점).")]
         [SerializeField] private RectTransform aiGemTarget;
 
         [Tooltip("중앙 보석 그리드의 위치 출처. CoinGridView 참조.")]
@@ -45,6 +44,13 @@ namespace Guskapaska.UI
         [SerializeField] private float gemFlightDuration = 0.5f;
         [SerializeField] private float gemFlightArcHeight = 80f;
 
+        [Header("Player Win Dissolve")]
+        [Tooltip("플레이어 승리 시 보석이 위로 떠오르는 높이(픽셀).")]
+        [SerializeField] private float playerWinRiseHeight = 120f;
+
+        [Tooltip("플레이어 승리 시 보석이 떠오르며 사라지는 데 걸리는 시간(초).")]
+        [SerializeField] private float playerWinDissolveDuration = 0.5f;
+
         // 현재 진행 중인 시퀀스의 코루틴. 새 호출이 들어오면 강제 종료한다.
         private Coroutine _activeSequence;
 
@@ -65,9 +71,9 @@ namespace Guskapaska.UI
         }
 
         /// <summary>
-        /// Animate <paramref name="count"/> gems flying from the rightmost filled cells
-        /// of the center grid to the specified winner's gem pile. On arrival, calls the
-        /// onArrived callback so the caller can update GemPileView and CoinGridView.
+        /// 중앙 그리드의 오른쪽 채워진 셀에서 <paramref name="count"/>개의 보석을 가져가는 연출을 시작한다.
+        /// 승자에 따라 연출이 분기되며(플레이어=떠올라 사라짐, AI=곰발바닥), 연출이 끝나면
+        /// onArrived 콜백을 호출해 호출자가 GemPileView / CoinGridView 수치를 갱신할 수 있게 한다.
         /// </summary>
         public void StartGemAcquisition(int count, bool winnerIsPlayer, System.Action onArrived)
         {
@@ -95,15 +101,6 @@ namespace Guskapaska.UI
             if (gemPrefab == null || coinGridView == null || animationContainer == null)
             {
                 Debug.LogWarning("[GemFlightAnimator] 필수 참조 누락으로 즉시 도착 처리됩니다.");
-                onArrived?.Invoke();
-                _activeSequence = null;
-                yield break;
-            }
-
-            RectTransform targetRt = winnerIsPlayer ? playerGemTarget : aiGemTarget;
-            if (targetRt == null)
-            {
-                Debug.LogWarning("[GemFlightAnimator] 도착 지점이 연결되지 않았습니다.");
                 onArrived?.Invoke();
                 _activeSequence = null;
                 yield break;
@@ -148,7 +145,32 @@ namespace Guskapaska.UI
                 yield break;
             }
 
-            // 3) 보석 솟구침 — 살짝 위로.
+            // 3) 승자에 따라 연출 분기.
+            //    플레이어 승리: 보석이 위로 떠오르며 사라짐 (곰발바닥/비행 없음).
+            if (winnerIsPlayer)
+            {
+                yield return PlayerWinDissolve(gemRts);
+                onArrived?.Invoke();
+                _activeSequence = null;
+                yield break;
+            }
+
+            // ───────────────────────────────────────────────
+            // 이하 AI 승리 연출 (기존 곰발바닥 시퀀스)
+            // ───────────────────────────────────────────────
+
+            // AI 더미가 도착 지점. 누락 시 보석만 정리하고 즉시 도착 처리.
+            RectTransform targetRt = aiGemTarget;
+            if (targetRt == null)
+            {
+                Debug.LogWarning("[GemFlightAnimator] AI 도착 지점이 연결되지 않았습니다.");
+                DestroyGems(gemRts);
+                onArrived?.Invoke();
+                _activeSequence = null;
+                yield break;
+            }
+
+            // 4) 보석 솟구침 — 살짝 위로.
             //    모든 보석을 동시에 띄우므로 각 보석마다 코루틴을 동시에 시작하고
             //    가장 긴 시간이 끝날 때까지 대기.
             List<Vector3> riseTargets = new List<Vector3>();
@@ -160,7 +182,7 @@ namespace Guskapaska.UI
 
             yield return AnimateAll(gemRts, riseTargets, gemRiseDuration, EasingCurves.EaseOutQuad);
 
-            // 4) 마리오 손 등장 + 보석 위로 내려옴.
+            // 5) 곰발바닥(마리오 손) 등장 + 보석 위로 내려옴.
             //    손은 보석들의 중앙 위치에서 위로 handStartYOffset 만큼 떨어진 곳에서 시작.
             GameObject handGo = null;
             RectTransform handRt = null;
@@ -192,14 +214,14 @@ namespace Guskapaska.UI
                 }
             }
 
-            // 5) 손이 잠시 멈춤 — 동시에 보석은 손 뒤에 가려져 있는 상태.
+            // 6) 손이 잠시 멈춤 — 동시에 보석은 손 뒤에 가려져 있는 상태.
             //    단순히 시간만 대기.
             if (handGo != null && handPauseDuration > 0f)
             {
                 yield return new WaitForSeconds(handPauseDuration);
             }
 
-            // 6) 손이 위로 사라지며 보석도 비행 시작 (동시 진행).
+            // 7) 손이 위로 사라지며 보석도 비행 시작 (동시 진행).
             //    손의 페이드아웃은 단순히 올라가는 것으로 표현 (별도 알파 페이드 안 함).
             if (handRt != null)
             {
@@ -208,7 +230,7 @@ namespace Guskapaska.UI
                 StartCoroutine(MoveAndDestroyHand(handRt, handFinalLocalPos, handExit, handGo));
             }
 
-            // 7) 보석 비행 시작 — 도착 지점은 targetRt의 월드 좌표를 container 로컬로 변환.
+            // 8) 보석 비행 시작 — 도착 지점은 targetRt(AI 더미)의 월드 좌표를 container 로컬로 변환.
             Vector3 endWorld = targetRt.position;
             Vector3 endLocal = animationContainer.InverseTransformPoint(endWorld);
 
@@ -222,20 +244,63 @@ namespace Guskapaska.UI
             // 모든 비행 트윈을 동시에 시작하고 가장 늦은 것이 끝날 때까지 대기.
             yield return RunAllParallel(flightRoutines);
 
-            // 8) 도착 — 비행 보석 인스턴스들을 정리.
-            foreach (RectTransform rt in gemRts)
-            {
-                if (rt != null && rt.gameObject != null)
-                {
-                    _spawnedTemporaries.Remove(rt.gameObject);
-                    Destroy(rt.gameObject);
-                }
-            }
+            // 9) 도착 — 비행 보석 인스턴스들을 정리.
+            DestroyGems(gemRts);
 
-            // 9) 콜백 — GemPileView 카운트 갱신, CoinGridView 갱신은 여기서.
+            // 10) 콜백 — GemPileView 카운트 갱신, CoinGridView 갱신은 여기서.
             onArrived?.Invoke();
 
             _activeSequence = null;
+        }
+
+        // 플레이어 승리 연출: 보석이 위로 떠오르며 페이드아웃되어 사라진다.
+        // 곰발바닥/비행 없이 제자리에서 위로 솟구치며 알파가 0으로 줄어든 뒤 파괴된다.
+        private IEnumerator PlayerWinDissolve(List<RectTransform> gemRts)
+        {
+            int n = gemRts.Count;
+
+            // 각 보석의 시작/도착 로컬 위치와 페이드용 CanvasGroup을 준비.
+            List<Vector3> starts = new List<Vector3>(n);
+            List<Vector3> ends = new List<Vector3>(n);
+            List<CanvasGroup> groups = new List<CanvasGroup>(n);
+
+            for (int i = 0; i < n; i++)
+            {
+                RectTransform rt = gemRts[i];
+                Vector3 start = rt.localPosition;
+                starts.Add(start);
+                ends.Add(start + new Vector3(0f, playerWinRiseHeight, 0f));
+
+                // 페이드를 위해 CanvasGroup 확보 (프리팹에 없으면 런타임에 추가).
+                CanvasGroup cg = rt.GetComponent<CanvasGroup>();
+                if (cg == null) cg = rt.gameObject.AddComponent<CanvasGroup>();
+                groups.Add(cg);
+            }
+
+            float duration = Mathf.Max(0.0001f, playerWinDissolveDuration);
+            AnimationCurve moveCurve = EasingCurves.EaseOutQuad; // 위로 떠오를 때 감속
+
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float u = Mathf.Clamp01(elapsed / duration);
+                float move = moveCurve.Evaluate(u);
+
+                for (int i = 0; i < n; i++)
+                {
+                    RectTransform rt = gemRts[i];
+                    if (rt == null) continue;
+
+                    rt.localPosition = Vector3.LerpUnclamped(starts[i], ends[i], move);
+                    if (groups[i] != null) groups[i].alpha = 1f - u; // 선형 페이드아웃
+                }
+
+                yield return null;
+            }
+
+            // 떠오른 보석 인스턴스 정리.
+            DestroyGems(gemRts);
         }
 
         // 손이 위로 사라진 후 GameObject 파괴.
@@ -247,6 +312,19 @@ namespace Guskapaska.UI
             {
                 _spawnedTemporaries.Remove(handGo);
                 Destroy(handGo);
+            }
+        }
+
+        // 전달받은 보석 RectTransform들을 임시 목록에서 빼고 파괴.
+        private void DestroyGems(List<RectTransform> gemRts)
+        {
+            foreach (RectTransform rt in gemRts)
+            {
+                if (rt != null && rt.gameObject != null)
+                {
+                    _spawnedTemporaries.Remove(rt.gameObject);
+                    Destroy(rt.gameObject);
+                }
             }
         }
 
