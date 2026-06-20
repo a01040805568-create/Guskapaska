@@ -551,11 +551,11 @@ RectTransform:
   - {fileID: 1086471355}
   m_Father: {fileID: 960557851}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 1, y: 0.5}
-  m_AnchorMax: {x: 1, y: 0.5}
-  m_AnchoredPosition: {x: -100, y: 0}
+  m_AnchorMin: {x: 0, y: 0.5}
+  m_AnchorMax: {x: 0, y: 0.5}
+  m_AnchoredPosition: {x: 50, y: 300}
   m_SizeDelta: {x: 160, y: 200}
-  m_Pivot: {x: 1, y: 0.5}
+  m_Pivot: {x: 0, y: 0.5}
 --- !u!1 &190236685
 GameObject:
   m_ObjectHideFlags: 0
@@ -1636,11 +1636,11 @@ RectTransform:
   - {fileID: 1232288568}
   m_Father: {fileID: 960557851}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0.5}
-  m_AnchorMax: {x: 0, y: 0.5}
-  m_AnchoredPosition: {x: 100, y: 0}
+  m_AnchorMin: {x: 1, y: 0.5}
+  m_AnchorMax: {x: 1, y: 0.5}
+  m_AnchoredPosition: {x: -50, y: -300}
   m_SizeDelta: {x: 160, y: 200}
-  m_Pivot: {x: 0, y: 0.5}
+  m_Pivot: {x: 1, y: 0.5}
 --- !u!1001 &770772885
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -4573,7 +4573,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: -20}
+  m_AnchoredPosition: {x: -831, y: -0.0000095367}
   m_SizeDelta: {x: 520, y: 40}
   m_Pivot: {x: 0.5, y: 1}
 --- !u!114 &1722064531
@@ -4781,7 +4781,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5564e4d4129d2d2418d0f424eb9f2b25, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Guskapaska.Game::Guskapaska.Game.PlayProgressRecorder
-  gameManager: {fileID: 2146237357}
 --- !u!4 &1783611117
 Transform:
   m_ObjectHideFlags: 0

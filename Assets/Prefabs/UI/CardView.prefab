@@ -137,6 +137,68 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!1 &110503320575527298
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8554034565946625481}
+  - component: {fileID: 2561301254259085820}
+  m_Layer: 5
+  m_Name: CoinGroup
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &8554034565946625481
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 110503320575527298}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 3121985080765181957}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: -40, y: 45}
+  m_SizeDelta: {x: 40, y: 70}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &2561301254259085820
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 110503320575527298}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 59f8146938fff824cb5fd77236b75775, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.VerticalLayoutGroup
+  m_Padding:
+    m_Left: 0
+    m_Right: 0
+    m_Top: 0
+    m_Bottom: 0
+  m_ChildAlignment: 0
+  m_Spacing: 4
+  m_ChildForceExpandWidth: 1
+  m_ChildForceExpandHeight: 1
+  m_ChildControlWidth: 0
+  m_ChildControlHeight: 0
+  m_ChildScaleWidth: 0
+  m_ChildScaleHeight: 0
+  m_ReverseArrangement: 0
 --- !u!1 &864972237559948409
 GameObject:
   m_ObjectHideFlags: 0
@@ -498,6 +560,7 @@ RectTransform:
   - {fileID: 3845033930131513575}
   - {fileID: 2166511641756845460}
   - {fileID: 7365118113274711766}
+  - {fileID: 8554034565946625481}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
@@ -560,11 +623,14 @@ MonoBehaviour:
   coinText: {fileID: 6616538975035778206}
   backFace: {fileID: 864972237559948409}
   frontFace: {fileID: 4016230205038093836}
+  canvasGroup: {fileID: 0}
   scissorsArt: {fileID: 7766721758921934520, guid: a6660e885eb836d4b99169020b32511d, type: 3}
   rockArt: {fileID: -2182124076254010665, guid: 4e06197dc8a9ac749b761b5beb3068b9, type: 3}
   paperArt: {fileID: -1469909079130451432, guid: 07201b87d53cc174abd26c63f2131a63, type: 3}
   cardBackArt: {fileID: -8246103488371625927, guid: bd386932cdaf9fe40af9353e3f8c219d, type: 3}
   artImage: {fileID: 5989268128826178922}
+  coinGroup: {fileID: 8554034565946625481}
+  coinPrefab: {fileID: 4205910467081683408, guid: 9f9ba55779f870146b8154d89e66aa4b, type: 3}
 --- !u!225 &1577074389668902535
 CanvasGroup:
   m_ObjectHideFlags: 0
